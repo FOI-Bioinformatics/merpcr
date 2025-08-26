@@ -3,14 +3,14 @@
 Unit tests for merPCR
 """
 
-import unittest
-import tempfile
 import os
 import sys
-import os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
+import tempfile
+import unittest
 
-from merpcr import MerPCR, FASTARecord, STSRecord
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
+
+from merpcr import FASTARecord, MerPCR, STSRecord
 
 
 class TestMerPCR(unittest.TestCase):
@@ -24,25 +24,24 @@ class TestMerPCR(unittest.TestCase):
             "TEST002\tCTTCTGCATGGATCAGAAAA\tACTCACCCAGATGATTGCTT\t103\tTest STS 2\n"
         )
 
-        self.sts_fd, self.sts_file = tempfile.mkstemp(suffix='.sts')
-        with os.fdopen(self.sts_fd, 'w') as f:
+        self.sts_fd, self.sts_file = tempfile.mkstemp(suffix=".sts")
+        with os.fdopen(self.sts_fd, "w") as f:
             f.write(self.sts_content)
 
         # Create a FASTA file that matches the expected PCR size
         # TEST001: GCTAAAAATACACGGATGG / TGCAAGACTGCGTCTC / 193bp
         # We need primer1 + ~150bp + primer2_rc to get close to 193bp total
         primer1 = "GCTAAAAATACACGGATGG"  # 19bp
-        primer2_rc = "GAGACGCAGTCTTGCA"    # 16bp
+        primer2_rc = "GAGACGCAGTCTTGCA"  # 16bp
         # Need about 158bp spacing to get 193bp total
         spacer = "A" * 158
-        
+
         self.fasta_content = (
-            ">test_sequence\n"
-            f"ACGTACGTACGT{primer1}{spacer}{primer2_rc}ACGTACGTACGT\n"
+            ">test_sequence\n" f"ACGTACGTACGT{primer1}{spacer}{primer2_rc}ACGTACGTACGT\n"
         )
 
-        self.fasta_fd, self.fasta_file = tempfile.mkstemp(suffix='.fa')
-        with os.fdopen(self.fasta_fd, 'w') as f:
+        self.fasta_fd, self.fasta_file = tempfile.mkstemp(suffix=".fa")
+        with os.fdopen(self.fasta_fd, "w") as f:
             f.write(self.fasta_content)
 
         # Initialize merPCR with standard parameters
@@ -53,7 +52,7 @@ class TestMerPCR(unittest.TestCase):
             three_prime_match=1,
             iupac_mode=0,
             default_pcr_size=240,
-            threads=1
+            threads=1,
         )
 
     def tearDown(self):
@@ -99,17 +98,17 @@ class TestMerPCR(unittest.TestCase):
     def test_compare_seqs(self):
         """Test sequence comparison with mismatches."""
         # Exact match
-        self.assertTrue(self.mer_pcr._compare_seqs("ACGT", "ACGT", '+'))
+        self.assertTrue(self.mer_pcr._compare_seqs("ACGT", "ACGT", "+"))
 
         # One mismatch - should fail with default parameters
-        self.assertFalse(self.mer_pcr._compare_seqs("ACGT", "ACGA", '+'))
+        self.assertFalse(self.mer_pcr._compare_seqs("ACGT", "ACGA", "+"))
 
         # One mismatch - should pass with mismatches=1 (not at 3' end)
         self.mer_pcr.mismatches = 1
-        self.assertTrue(self.mer_pcr._compare_seqs("ACGT", "TCGT", '+'))
+        self.assertTrue(self.mer_pcr._compare_seqs("ACGT", "TCGT", "+"))
 
         # One mismatch at 3' end - should fail even with mismatches=1
-        self.assertFalse(self.mer_pcr._compare_seqs("ACGT", "ACGA", '+'))
+        self.assertFalse(self.mer_pcr._compare_seqs("ACGT", "ACGA", "+"))
 
         # Reset to default
         self.mer_pcr.mismatches = 0

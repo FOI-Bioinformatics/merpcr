@@ -6,19 +6,18 @@ import argparse
 import logging
 import sys
 
-from .core.engine import MerPCR, DEFAULT_MARGIN, DEFAULT_WORDSIZE, DEFAULT_MISMATCHES, \
-    DEFAULT_THREE_PRIME_MATCH, DEFAULT_PCR_SIZE, DEFAULT_IUPAC_MODE, DEFAULT_THREADS
+from .core.engine import (DEFAULT_IUPAC_MODE, DEFAULT_MARGIN,
+                          DEFAULT_MISMATCHES, DEFAULT_PCR_SIZE,
+                          DEFAULT_THREADS, DEFAULT_THREE_PRIME_MATCH,
+                          DEFAULT_WORDSIZE, MerPCR)
 
 
 def setup_logging(quiet: int, debug: bool) -> None:
     """Set up logging based on arguments."""
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s - %(levelname)s - %(message)s"
-    )
-    
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+
     logger = logging.getLogger("merpcr")
-    
+
     if debug:
         logger.setLevel(logging.DEBUG)
     elif quiet == 0:
@@ -31,44 +30,80 @@ def create_parser() -> argparse.ArgumentParser:
     """Create argument parser for merPCR."""
     parser = argparse.ArgumentParser(
         description="merPCR - Modern Electronic Rapid PCR",
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
 
-    parser.add_argument('sts_file', type=str, help="STS file (tab-delimited)")
-    parser.add_argument('fasta_file', type=str, help="FASTA sequence file")
+    parser.add_argument("sts_file", type=str, help="STS file (tab-delimited)")
+    parser.add_argument("fasta_file", type=str, help="FASTA sequence file")
 
-    parser.add_argument('-M', '--margin', type=int, default=DEFAULT_MARGIN,
-                        help=f"Margin (default: {DEFAULT_MARGIN})")
+    parser.add_argument(
+        "-M",
+        "--margin",
+        type=int,
+        default=DEFAULT_MARGIN,
+        help=f"Margin (default: {DEFAULT_MARGIN})",
+    )
 
-    parser.add_argument('-N', '--mismatches', type=int, default=DEFAULT_MISMATCHES,
-                        help=f"Number of mismatches allowed (default: {DEFAULT_MISMATCHES})")
+    parser.add_argument(
+        "-N",
+        "--mismatches",
+        type=int,
+        default=DEFAULT_MISMATCHES,
+        help=f"Number of mismatches allowed (default: {DEFAULT_MISMATCHES})",
+    )
 
-    parser.add_argument('-W', '--wordsize', type=int, default=DEFAULT_WORDSIZE,
-                        help=f"Word size (default: {DEFAULT_WORDSIZE})")
+    parser.add_argument(
+        "-W",
+        "--wordsize",
+        type=int,
+        default=DEFAULT_WORDSIZE,
+        help=f"Word size (default: {DEFAULT_WORDSIZE})",
+    )
 
-    parser.add_argument('-T', '--threads', type=int, default=DEFAULT_THREADS,
-                        help=f"Number of threads (default: {DEFAULT_THREADS})")
+    parser.add_argument(
+        "-T",
+        "--threads",
+        type=int,
+        default=DEFAULT_THREADS,
+        help=f"Number of threads (default: {DEFAULT_THREADS})",
+    )
 
-    parser.add_argument('-X', '--three-prime-match', type=int, default=DEFAULT_THREE_PRIME_MATCH,
-                        help=f"Number of 3'-ward bases in which to disallow mismatches (default: {DEFAULT_THREE_PRIME_MATCH})")
+    parser.add_argument(
+        "-X",
+        "--three-prime-match",
+        type=int,
+        default=DEFAULT_THREE_PRIME_MATCH,
+        help=f"Number of 3'-ward bases in which to disallow mismatches (default: {DEFAULT_THREE_PRIME_MATCH})",
+    )
 
-    parser.add_argument('-O', '--output', type=str, default=None,
-                        help="Output file name (default: stdout)")
+    parser.add_argument(
+        "-O", "--output", type=str, default=None, help="Output file name (default: stdout)"
+    )
 
-    parser.add_argument('-Q', '--quiet', type=int, choices=[0, 1], default=1,
-                        help="Quiet flag (0=verbose, 1=quiet)")
+    parser.add_argument(
+        "-Q", "--quiet", type=int, choices=[0, 1], default=1, help="Quiet flag (0=verbose, 1=quiet)"
+    )
 
-    parser.add_argument('-Z', '--default-pcr-size', type=int, default=DEFAULT_PCR_SIZE,
-                        help=f"Default PCR size (default: {DEFAULT_PCR_SIZE})")
+    parser.add_argument(
+        "-Z",
+        "--default-pcr-size",
+        type=int,
+        default=DEFAULT_PCR_SIZE,
+        help=f"Default PCR size (default: {DEFAULT_PCR_SIZE})",
+    )
 
-    parser.add_argument('-I', '--iupac', type=int, choices=[0, 1], default=DEFAULT_IUPAC_MODE,
-                        help="IUPAC flag (0=don't honor IUPAC ambiguity symbols, 1=honor IUPAC symbols)")
+    parser.add_argument(
+        "-I",
+        "--iupac",
+        type=int,
+        choices=[0, 1],
+        default=DEFAULT_IUPAC_MODE,
+        help="IUPAC flag (0=don't honor IUPAC ambiguity symbols, 1=honor IUPAC symbols)",
+    )
 
-    parser.add_argument('-v', '--version', action='version',
-                        version="merPCR version 1.0.0")
+    parser.add_argument("-v", "--version", action="version", version="merPCR version 1.0.0")
 
-    parser.add_argument('--debug', action='store_true',
-                        help="Enable debug logging")
+    parser.add_argument("--debug", action="store_true", help="Enable debug logging")
 
     return parser
 
@@ -80,7 +115,7 @@ def main() -> int:
 
     # Set up logging
     setup_logging(args.quiet, args.debug)
-    
+
     logger = logging.getLogger("merpcr")
 
     try:
@@ -92,7 +127,7 @@ def main() -> int:
             three_prime_match=args.three_prime_match,
             iupac_mode=args.iupac,
             default_pcr_size=args.default_pcr_size,
-            threads=args.threads
+            threads=args.threads,
         )
 
         # Load STS file
@@ -116,6 +151,7 @@ def main() -> int:
         logger.error(f"Error: {str(e)}")
         if args.debug:
             import traceback
+
             traceback.print_exc()
         return 1
 

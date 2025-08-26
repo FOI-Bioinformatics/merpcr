@@ -11,14 +11,14 @@ import sys
 import time
 from typing import Dict, List, Optional
 
-from .models import STSRecord, FASTARecord, STSHit, ThreadData
 from ..io.fasta import FASTALoader
+from .models import FASTARecord, STSHit, STSRecord, ThreadData
 
 # Constants
 AMBIG = 100
 MIN_FILESIZE_FOR_THREADING = 100000
 
-# Default parameters  
+# Default parameters
 DEFAULT_MARGIN = 50
 DEFAULT_WORDSIZE = 11
 DEFAULT_MISMATCHES = 0
@@ -44,14 +44,16 @@ logger = logging.getLogger(__name__)
 class MerPCR:
     """Main merPCR class that handles all the e-PCR functionality."""
 
-    def __init__(self,
-                 wordsize: int = DEFAULT_WORDSIZE,
-                 margin: int = DEFAULT_MARGIN,
-                 mismatches: int = DEFAULT_MISMATCHES,
-                 three_prime_match: int = DEFAULT_THREE_PRIME_MATCH,
-                 iupac_mode: int = DEFAULT_IUPAC_MODE,
-                 default_pcr_size: int = DEFAULT_PCR_SIZE,
-                 threads: int = DEFAULT_THREADS):
+    def __init__(
+        self,
+        wordsize: int = DEFAULT_WORDSIZE,
+        margin: int = DEFAULT_MARGIN,
+        mismatches: int = DEFAULT_MISMATCHES,
+        three_prime_match: int = DEFAULT_THREE_PRIME_MATCH,
+        iupac_mode: int = DEFAULT_IUPAC_MODE,
+        default_pcr_size: int = DEFAULT_PCR_SIZE,
+        threads: int = DEFAULT_THREADS,
+    ):
         """Initialize the MerPCR class with search parameters."""
         self.wordsize = wordsize
         self.margin = margin
@@ -79,7 +81,9 @@ class MerPCR:
             raise ValueError(f"Word size must be between {MIN_WORDSIZE} and {MAX_WORDSIZE}")
 
         if not (MIN_MISMATCHES <= self.mismatches <= MAX_MISMATCHES):
-            raise ValueError(f"Number of mismatches must be between {MIN_MISMATCHES} and {MAX_MISMATCHES}")
+            raise ValueError(
+                f"Number of mismatches must be between {MIN_MISMATCHES} and {MAX_MISMATCHES}"
+            )
 
         if not (MIN_MARGIN <= self.margin <= MAX_MARGIN):
             raise ValueError(f"Margin must be between {MIN_MARGIN} and {MAX_MARGIN}")
@@ -96,19 +100,32 @@ class MerPCR:
         self.scode = [AMBIG] * 256
 
         # Add both uppercase and lowercase codes
-        self.scode[ord('A')] = self.scode[ord('a')] = 0
-        self.scode[ord('C')] = self.scode[ord('c')] = 1
-        self.scode[ord('G')] = self.scode[ord('g')] = 2
-        self.scode[ord('T')] = self.scode[ord('t')] = 3
-        self.scode[ord('U')] = self.scode[ord('u')] = 3  # Treat U (RNA) as T
+        self.scode[ord("A")] = self.scode[ord("a")] = 0
+        self.scode[ord("C")] = self.scode[ord("c")] = 1
+        self.scode[ord("G")] = self.scode[ord("g")] = 2
+        self.scode[ord("T")] = self.scode[ord("t")] = 3
+        self.scode[ord("U")] = self.scode[ord("u")] = 3  # Treat U (RNA) as T
 
         # Complement table for reverse complement
         self.compl = {}
         compl_pairs = {
-            'A': 'T', 'C': 'G', 'G': 'C', 'T': 'A', 'U': 'A',
-            'B': 'V', 'D': 'H', 'H': 'D', 'K': 'M',
-            'M': 'K', 'N': 'N', 'R': 'Y', 'S': 'S',
-            'V': 'B', 'W': 'W', 'X': 'X', 'Y': 'R'
+            "A": "T",
+            "C": "G",
+            "G": "C",
+            "T": "A",
+            "U": "A",
+            "B": "V",
+            "D": "H",
+            "H": "D",
+            "K": "M",
+            "M": "K",
+            "N": "N",
+            "R": "Y",
+            "S": "S",
+            "V": "B",
+            "W": "W",
+            "X": "X",
+            "Y": "R",
         }
         # Add lowercase complements too
         for k, v in compl_pairs.items():
@@ -117,15 +134,39 @@ class MerPCR:
 
         # IUPAC ambiguity table
         self.iupac_mapping = {
-            'A': "A", 'C': "C", 'G': "G", 'T': "TU", 'U': "TU",
-            'R': "AGR", 'Y': "CTUY", 'M': "ACM", 'K': "GTUK", 'S': "CGS", 'W': "ATUW",
-            'B': "CGTUYKSB", 'D': "AGTURKWD", 'H': "ACTUYMWH", 'V': "ACGRMSV",
-            'N': "ACGTURYMKSWBDHVN",
+            "A": "A",
+            "C": "C",
+            "G": "G",
+            "T": "TU",
+            "U": "TU",
+            "R": "AGR",
+            "Y": "CTUY",
+            "M": "ACM",
+            "K": "GTUK",
+            "S": "CGS",
+            "W": "ATUW",
+            "B": "CGTUYKSB",
+            "D": "AGTURKWD",
+            "H": "ACTUYMWH",
+            "V": "ACGRMSV",
+            "N": "ACGTURYMKSWBDHVN",
             # Also add lowercase entries
-            'a': "A", 'c': "C", 'g': "G", 't': "TU", 'u': "TU",
-            'r': "AGR", 'y': "CTUY", 'm': "ACM", 'k': "GTUK", 's': "CGS", 'w': "ATUW",
-            'b': "CGTUYKSB", 'd': "AGTURKWD", 'h': "ACTUYMWH", 'v': "ACGRMSV",
-            'n': "ACGTURYMKSWBDHVN"
+            "a": "A",
+            "c": "C",
+            "g": "G",
+            "t": "TU",
+            "u": "TU",
+            "r": "AGR",
+            "y": "CTUY",
+            "m": "ACM",
+            "k": "GTUK",
+            "s": "CGS",
+            "w": "ATUW",
+            "b": "CGTUYKSB",
+            "d": "AGTURKWD",
+            "h": "ACTUYMWH",
+            "v": "ACGRMSV",
+            "n": "ACGTURYMKSWBDHVN",
         }
 
         # Initialize IUPAC match matrix if IUPAC mode is enabled
@@ -166,7 +207,7 @@ class MerPCR:
         bad_primers_ambig = 0
         bad_pcr_size = 0
 
-        with open(filename, 'r') as file:
+        with open(filename, "r") as file:
             lines = file.readlines()
             line_no = 0
 
@@ -175,13 +216,15 @@ class MerPCR:
                 line = line.strip()
 
                 # Skip comments and blank lines
-                if not line or line.startswith('#'):
+                if not line or line.startswith("#"):
                     continue
 
                 # Parse tab-delimited fields
-                fields = line.split('\t')
+                fields = line.split("\t")
                 if len(fields) < 4:
-                    logger.error(f"Bad STS file format at line {line_no}. Expected at least 4 fields.")
+                    logger.error(
+                        f"Bad STS file format at line {line_no}. Expected at least 4 fields."
+                    )
                     return False
 
                 sts_id = fields[0]
@@ -213,13 +256,13 @@ class MerPCR:
                     pcr_size=pcr_size,
                     alias=alias,
                     offset=line_no,
-                    direct='+'
+                    direct="+",
                 )
 
                 # Forward primer hash
                 hash_offset1, hash_value1 = self._hash_value(primer1)
                 if hash_offset1 >= 0:
-                    sts_for = STSRecord(**{**vars(sts), 'hash_offset': hash_offset1, 'direct': '+'})
+                    sts_for = STSRecord(**{**vars(sts), "hash_offset": hash_offset1, "direct": "+"})
                     self._insert_sts(sts_for, hash_value1)
                 else:
                     bad_primers_ambig += 1
@@ -228,7 +271,7 @@ class MerPCR:
                 rev_primer1 = self._reverse_complement(primer1)
                 hash_offset2, hash_value2 = self._hash_value(primer2)
                 if hash_offset2 >= 0:
-                    sts_rev = STSRecord(**{**vars(sts), 'hash_offset': hash_offset2, 'direct': '-'})
+                    sts_rev = STSRecord(**{**vars(sts), "hash_offset": hash_offset2, "direct": "-"})
                     sts_rev.primer1 = primer2
                     sts_rev.primer2 = rev_primer1
                     self._insert_sts(sts_rev, hash_value2)
@@ -237,22 +280,30 @@ class MerPCR:
 
         # Report statistics
         if bad_primers_short > 0:
-            logger.warning(f"{bad_primers_short} STSs have primer shorter than word size ({self.wordsize}): not included in search")
+            logger.warning(
+                f"{bad_primers_short} STSs have primer shorter than word size ({self.wordsize}): not included in search"
+            )
 
         if bad_primers_ambig > 0:
-            logger.warning(f"{bad_primers_ambig} primers have ambiguities which prevent computation of a hash value: not included in search")
+            logger.warning(
+                f"{bad_primers_ambig} primers have ambiguities which prevent computation of a hash value: not included in search"
+            )
 
         if bad_pcr_size > 0:
-            logger.warning(f"{bad_pcr_size} STSs have a primer length sum greater than the pcr size: expected pcr size adjusted")
+            logger.warning(
+                f"{bad_pcr_size} STSs have a primer length sum greater than the pcr size: expected pcr size adjusted"
+            )
 
-        logger.info(f"Loaded {len(self.sts_records)} STS records in {time.time() - start_time:.2f} seconds")
+        logger.info(
+            f"Loaded {len(self.sts_records)} STS records in {time.time() - start_time:.2f} seconds"
+        )
         return True
 
     def _parse_pcr_size(self, pcr_size_str: str) -> int:
         """Parse PCR size from string, handling ranges."""
-        if '-' in pcr_size_str:
+        if "-" in pcr_size_str:
             try:
-                size_range = pcr_size_str.split('-')
+                size_range = pcr_size_str.split("-")
                 if len(size_range) == 2 and size_range[0] and size_range[1]:
                     low = int(size_range[0])
                     high = int(size_range[1])
@@ -303,7 +354,7 @@ class MerPCR:
 
     def _reverse_complement(self, sequence: str) -> str:
         """Return the reverse complement of a DNA sequence."""
-        return ''.join(self.compl.get(base, 'N') for base in reversed(sequence))
+        return "".join(self.compl.get(base, "N") for base in reversed(sequence))
 
     def load_fasta_file(self, filename: str) -> List[FASTARecord]:
         """Load sequences from a FASTA file."""
@@ -312,7 +363,7 @@ class MerPCR:
     def search(self, fasta_records: List[FASTARecord], output_file: str = None) -> int:
         """Search for STS markers in the provided FASTA sequences."""
         total_hits = 0
-        output = open(output_file, 'w') if output_file else sys.stdout
+        output = open(output_file, "w") if output_file else sys.stdout
 
         for record in fasta_records:
             seq_label = record.label
@@ -344,13 +395,15 @@ class MerPCR:
 
             for i in range(num_threads):
                 length = chunk_size if i < num_threads - 1 else seq_len - offset
-                thread_data.append(ThreadData(
-                    thread_id=i,
-                    sequence=sequence[offset:offset+length],
-                    offset=offset,
-                    length=length
-                ))
-                offset += (length - overlap)
+                thread_data.append(
+                    ThreadData(
+                        thread_id=i,
+                        sequence=sequence[offset : offset + length],
+                        offset=offset,
+                        length=length,
+                    )
+                )
+                offset += length - overlap
 
             # Execute search in parallel
             if num_threads > 1:
@@ -407,7 +460,7 @@ class MerPCR:
 
         # Initialize the hash with the first wordsize bases
         for i in range(self.wordsize):
-            h = (h << 2)
+            h = h << 2
             if p + i >= seq_len:
                 break
 
@@ -446,13 +499,15 @@ class MerPCR:
 
         return thread_data
 
-    def _match_sts(self, sequence: str, seq_len: int, k: int, sts: STSRecord, thread_data: ThreadData) -> int:
+    def _match_sts(
+        self, sequence: str, seq_len: int, k: int, sts: STSRecord, thread_data: ThreadData
+    ) -> int:
         """Try to match an STS at position k in the sequence."""
         primer1 = sts.primer1
         len_p1 = len(primer1)
 
         # Check if the whole primer matches (not just the hash word)
-        if k + len_p1 <= seq_len and self._compare_seqs(sequence[k:k+len_p1], primer1, '+'):
+        if k + len_p1 <= seq_len and self._compare_seqs(sequence[k : k + len_p1], primer1, "+"):
             primer2 = sts.primer2
             len_p2 = len(primer2)
             exp_size = sts.pcr_size
@@ -484,13 +539,15 @@ class MerPCR:
 
             # Ensure p2_pos is valid
             if k + len_p1 <= p2_pos and p2_pos + len_p2 <= seq_len:
-                if self._compare_seqs(sequence[p2_pos:p2_pos+len_p2], primer2, '-'):
+                if self._compare_seqs(sequence[p2_pos : p2_pos + len_p2], primer2, "-"):
                     actual_product_size = (p2_pos + len_p2) - k
-                    thread_data.hits.append(STSHit(
-                        pos1=k + thread_data.offset,
-                        pos2=k+actual_product_size-1 + thread_data.offset,
-                        sts=sts
-                    ))
+                    thread_data.hits.append(
+                        STSHit(
+                            pos1=k + thread_data.offset,
+                            pos2=k + actual_product_size - 1 + thread_data.offset,
+                            sts=sts,
+                        )
+                    )
                     count = 1
                 else:
                     count = 0
@@ -504,26 +561,30 @@ class MerPCR:
                     p2_pos = k + exp_size - len_p2 - i
                     # Ensure second primer is after first primer
                     if k + len_p1 <= p2_pos and p2_pos + len_p2 <= seq_len:
-                        if self._compare_seqs(sequence[p2_pos:p2_pos+len_p2], primer2, '-'):
+                        if self._compare_seqs(sequence[p2_pos : p2_pos + len_p2], primer2, "-"):
                             actual_product_size = (p2_pos + len_p2) - k
-                            thread_data.hits.append(STSHit(
-                                pos1=k + thread_data.offset,
-                                pos2=k+actual_product_size-1 + thread_data.offset,
-                                sts=sts
-                            ))
+                            thread_data.hits.append(
+                                STSHit(
+                                    pos1=k + thread_data.offset,
+                                    pos2=k + actual_product_size - 1 + thread_data.offset,
+                                    sts=sts,
+                                )
+                            )
                             count += 1
 
                 # Try higher margin
                 if i <= hi_margin:
                     p2_pos = k + exp_size - len_p2 + i
                     if p2_pos + len_p2 <= seq_len:
-                        if self._compare_seqs(sequence[p2_pos:p2_pos+len_p2], primer2, '-'):
+                        if self._compare_seqs(sequence[p2_pos : p2_pos + len_p2], primer2, "-"):
                             actual_product_size = (p2_pos + len_p2) - k
-                            thread_data.hits.append(STSHit(
-                                pos1=k + thread_data.offset,
-                                pos2=k+actual_product_size-1 + thread_data.offset,
-                                sts=sts
-                            ))
+                            thread_data.hits.append(
+                                STSHit(
+                                    pos1=k + thread_data.offset,
+                                    pos2=k + actual_product_size - 1 + thread_data.offset,
+                                    sts=sts,
+                                )
+                            )
                             count += 1
 
             return count
@@ -540,8 +601,9 @@ class MerPCR:
 
         for i in range(seq_len):
             # Check if the position is in the 3' protected region
-            in_3prime_protected = ((strand == '+' and i >= seq_len - self.three_prime_match) or
-                                (strand == '-' and i < self.three_prime_match))
+            in_3prime_protected = (strand == "+" and i >= seq_len - self.three_prime_match) or (
+                strand == "-" and i < self.three_prime_match
+            )
 
             # Use IUPAC comparison if enabled
             if self.iupac_mode:

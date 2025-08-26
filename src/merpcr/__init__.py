@@ -9,6 +9,6 @@ __author__ = "merPCR Contributors"
 __license__ = "GPL-3.0"
 
 from .core.engine import MerPCR
-from .core.models import STSRecord, FASTARecord, STSHit
+from .core.models import FASTARecord, STSHit, STSRecord
 
-__all__ = ['MerPCR', 'STSRecord', 'FASTARecord', 'STSHit']
+__all__ = ["MerPCR", "STSRecord", "FASTARecord", "STSHit"]

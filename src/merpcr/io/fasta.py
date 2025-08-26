@@ -39,17 +39,17 @@ class FASTALoader:
         current_defline = None
         current_sequence = []
 
-        with open(filename, 'r') as file:
+        with open(filename, "r") as file:
             for line in file:
                 line = line.strip()
 
                 if not line:
                     continue
 
-                if line.startswith('>'):
+                if line.startswith(">"):
                     # If we were already working on a sequence, save it
                     if current_defline is not None:
-                        seq = ''.join(current_sequence)
+                        seq = "".join(current_sequence)
                         fasta_records.append(FASTARecord(defline=current_defline, sequence=seq))
 
                     # Start a new sequence
@@ -57,13 +57,15 @@ class FASTALoader:
                     current_sequence = []
                 else:
                     # Add to current sequence, keeping only valid nucleotide characters
-                    filtered_line = ''.join(c for c in line if c.upper() in 'ACGTBDHKMNRSVWXY')
+                    filtered_line = "".join(c for c in line if c.upper() in "ACGTBDHKMNRSVWXY")
                     current_sequence.append(filtered_line)
 
         # Don't forget the last sequence
         if current_defline is not None:
-            seq = ''.join(current_sequence)
+            seq = "".join(current_sequence)
             fasta_records.append(FASTARecord(defline=current_defline, sequence=seq))
 
-        logger.info(f"Loaded {len(fasta_records)} sequences in {time.time() - start_time:.2f} seconds")
+        logger.info(
+            f"Loaded {len(fasta_records)} sequences in {time.time() - start_time:.2f} seconds"
+        )
         return fasta_records
