@@ -1,0 +1,161 @@
+name: Code Quality
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+env:
+  FORCE_COLOR: 1
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install flake8 black isort mypy bandit safety
+
+    - name: Run flake8
+      run: |
+        flake8 src/ tests/ --count --select=E9,F63,F7,F82 --show-source --statistics
+        flake8 src/ tests/ --count --exit-zero --max-complexity=10 --max-line-length=88 --statistics
+
+    - name: Check code formatting with black
+      run: |
+        black --check --diff src/ tests/
+
+    - name: Check import sorting with isort
+      run: |
+        isort --check-only --diff src/ tests/
+
+    - name: Run mypy type checking
+      run: |
+        mypy src/ --ignore-missing-imports --no-strict-optional || true
+
+    - name: Run bandit security linter
+      run: |
+        bandit -r src/ -f json -o bandit-report.json || true
+        bandit -r src/ || true
+
+    - name: Check dependencies for security vulnerabilities
+      run: |
+        safety check --json || true
+
+    - name: Upload bandit results
+      uses: actions/upload-artifact@v3
+      with:
+        name: bandit-report
+        path: bandit-report.json
+      if: always()
+
+  formatting:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install black isort
+
+    - name: Format code with black
+      run: |
+        black src/ tests/
+
+    - name: Sort imports with isort
+      run: |
+        isort src/ tests/
+
+    - name: Check for changes
+      id: verify-changed-files
+      run: |
+        if [ -n "$(git status --porcelain)" ]; then
+          echo "changed=true" >> $GITHUB_OUTPUT
+        else
+          echo "changed=false" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Commit changes
+      if: steps.verify-changed-files.outputs.changed == 'true'
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git add -A
+        git commit -m "Auto-format code with black and isort" || true
+
+    - name: Push changes
+      if: steps.verify-changed-files.outputs.changed == 'true'
+      uses: ad-m/github-push-action@master
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        branch: ${{ github.head_ref }}
+
+  docs:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -e .
+
+    - name: Check that documentation is up to date
+      run: |
+        # Check if any Python files have been modified more recently than docs
+        if find src/ -name "*.py" -newer docs/API.md -print -quit | grep -q .; then
+          echo "Warning: Source code is newer than API documentation"
+          exit 1
+        fi
+
+    - name: Validate documentation links
+      run: |
+        # Simple check for broken internal links
+        for file in docs/*.md README.md; do
+          if [ -f "$file" ]; then
+            echo "Checking $file for broken links..."
+            # Check for links to files that don't exist
+            grep -o '\[.*\]([^)]*\.md[^)]*)' "$file" | sed 's/.*(\([^)]*\)).*/\1/' | while read link; do
+              if [[ "$link" != http* ]] && [[ ! -f "$(dirname "$file")/$link" ]]; then
+                echo "Broken link found in $file: $link"
+                exit 1
+              fi
+            done
+          fi
+        done
+
+    - name: Check README consistency
+      run: |
+        # Ensure main README mentions all key features from docs
+        if ! grep -q "API Reference" README.md; then
+          echo "Warning: README should mention API Reference documentation"
+        fi
+        if ! grep -q "User Guide" README.md; then
+          echo "Warning: README should mention User Guide documentation"  
+        fi
