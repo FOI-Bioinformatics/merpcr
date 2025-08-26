@@ -173,7 +173,7 @@ class TestReverseComplement(unittest.TestCase):
     def test_ambiguous_bases(self):
         """Test reverse complement with ambiguous bases."""
         self.assertEqual(self.mer_pcr._reverse_complement("ATCGN"), "NCGAT")
-        self.assertEqual(self.mer_pcr._reverse_complement("RWYS"), "SWYR")
+        self.assertEqual(self.mer_pcr._reverse_complement("RWYS"), "SRWY")
         self.assertEqual(self.mer_pcr._reverse_complement("BDHV"), "BDHV")  # These are self-complementary sets
     
     def test_case_preservation(self):

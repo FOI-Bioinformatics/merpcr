@@ -96,7 +96,7 @@ WXYZ789GCTA
         
         self.assertEqual(len(records), 1)
         # Should keep valid nucleotides including ambiguity codes
-        self.assertEqual(records[0].sequence, "ATCGNNNATCGWXYGCTA")
+        self.assertEqual(records[0].sequence, "ATCGNNNNATCGWXYGCTA")
     
     def test_empty_file(self):
         """Test loading empty file."""
@@ -113,9 +113,11 @@ WXYZ789GCTA
         
         records = FASTALoader.load_file(temp_file)
         
-        self.assertEqual(len(records), 1)
+        self.assertEqual(len(records), 2)
         self.assertEqual(records[0].label, "seq1")
         self.assertEqual(records[0].sequence, "")
+        self.assertEqual(records[1].label, "seq2")
+        self.assertEqual(records[1].sequence, "")
     
     def test_blank_lines(self):
         """Test handling of blank lines."""
@@ -141,10 +143,8 @@ AAAA
     
     def test_nonexistent_file(self):
         """Test loading nonexistent file."""
-        with self.assertLogs(level='ERROR') as cm:
+        with self.assertRaises(FileNotFoundError):
             records = FASTALoader.load_file("/nonexistent/file.fa")
-        
-        self.assertEqual(len(records), 0)
 
 
 @pytest.mark.integration
