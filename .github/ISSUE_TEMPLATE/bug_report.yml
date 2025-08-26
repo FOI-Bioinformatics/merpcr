@@ -1,0 +1,106 @@
+name: Bug Report
+description: File a bug report to help us improve merPCR
+title: "[BUG] "
+labels: [bug, triage]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for reporting a bug! Please fill out the information below to help us reproduce and fix the issue.
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Pre-submission Checklist
+      options:
+        - label: I have searched existing issues to ensure this is not a duplicate
+          required: true
+        - label: I have tested with the latest version of merPCR
+          required: true
+        - label: I have read the documentation and troubleshooting guide
+          required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug Description
+      description: A clear and concise description of what the bug is
+      placeholder: Describe the issue...
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to Reproduce
+      description: Detailed steps to reproduce the behavior
+      placeholder: |
+        1. Run command '...'
+        2. With input files '...'
+        3. See error '...'
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      description: A clear description of what you expected to happen
+      placeholder: What should have happened?
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual Behavior
+      description: A clear description of what actually happened
+      placeholder: What actually happened? Include error messages if any.
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment Information
+      description: Information about your environment
+      placeholder: |
+        - merPCR version: [e.g., 1.0.0]
+        - Python version: [e.g., 3.11.0]
+        - Operating System: [e.g., Ubuntu 22.04, macOS 13.0, Windows 11]
+        - Installation method: [e.g., pip install, git clone]
+    validations:
+      required: true
+
+  - type: textarea
+    id: command
+    attributes:
+      label: Command Used
+      description: The exact command that caused the issue
+      render: bash
+      placeholder: merpcr -M 50 -N 1 markers.sts genome.fa
+
+  - type: textarea
+    id: files
+    attributes:
+      label: Input Files
+      description: Information about your input files (do not upload sensitive data)
+      placeholder: |
+        - STS file: number of markers, format, source
+        - FASTA file: sequence length, format, source
+        - Any unusual characteristics of the input data
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Log Output
+      description: Relevant log output (run with --debug flag if possible)
+      render: text
+      placeholder: Include error messages, stack traces, or debug output
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional Context
+      description: Any other context about the problem
+      placeholder: Screenshots, related issues, workarounds, etc.

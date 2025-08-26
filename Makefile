@@ -1,42 +1,66 @@
-# Makefile for merPCR
+.PHONY: test coverage lint format clean install dev-install build upload help
 
-.PHONY: all test clean install docs
+help:
+	@echo "Available targets:"
+	@echo "  test          - Run all tests"
+	@echo "  test-unit     - Run unit tests only"
+	@echo "  test-integration - Run integration tests only"
+	@echo "  test-performance - Run performance tests"
+	@echo "  coverage      - Run tests with coverage report"
+	@echo "  lint          - Run code linting"
+	@echo "  format        - Format code with black and isort"
+	@echo "  clean         - Clean build artifacts"
+	@echo "  install       - Install package"
+	@echo "  dev-install   - Install package in development mode"
+	@echo "  build         - Build distribution packages"
+	@echo "  upload        - Upload to PyPI (requires authentication)"
 
-# Default target
-all: test
-
-# Install the package
-install:
-	pip install -e .
-
-# Run tests
 test:
-	python -m unittest test_merPCR.py
+	pytest
 
-# Run a simple demonstration with the test data
-demo:
-	python merPCR.py test/test.sts test/test.fa
+test-unit:
+	pytest -m "unit or not (integration or performance or cli)"
 
-# Clean up temporary files
+test-integration:
+	pytest -m integration
+
+test-performance:
+	SKIP_PERFORMANCE_TESTS= pytest tests/test_performance.py -v
+
+coverage:
+	coverage run -m pytest
+	coverage report
+	coverage html
+	@echo "Coverage report generated in htmlcov/index.html"
+
+lint:
+	flake8 src/ tests/
+	black --check src/ tests/
+	isort --check-only src/ tests/
+
+format:
+	black src/ tests/
+	isort src/ tests/
+
 clean:
-	rm -rf __pycache__
-	rm -rf *.egg-info
 	rm -rf build/
 	rm -rf dist/
-	rm -f *.pyc
-	find . -name "__pycache__" -type d -exec rm -rf {} +
-	find . -name "*.pyc" -delete
+	rm -rf *.egg-info/
+	rm -rf .tox/
+	rm -rf htmlcov/
+	rm -rf .coverage
+	rm -rf coverage.xml
+	find . -type d -name __pycache__ -exec rm -rf {} +
+	find . -type f -name "*.pyc" -delete
 
-# Format code with Black (must be installed)
-format:
-	black merPCR.py test_merPCR.py example.py setup.py
+install:
+	pip install .
 
-# Run static type checking with mypy (must be installed)
-typecheck:
-	mypy merPCR.py
+dev-install:
+	pip install -e .
 
-# Generate HTML documentation with pydoc
-docs:
-	mkdir -p docs
-	pydoc -w merPCR
-	mv merPCR.html docs/
+build: clean
+	python -m build
+
+upload: build
+	python -m twine upload dist/*

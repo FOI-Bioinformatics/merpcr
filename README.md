@@ -7,7 +7,16 @@ Gregory Schuler at NCBI and enhanced by Kevin Murphy at Children's Hospital of P
 
 merPCR is a tool for searching large DNA sequences for Sequence-Tagged Sites (STS) markers. STSs are defined as two short subsequences (primers) separated by an approximate distance. They are commonly used in genome mapping and chromosome identification.
 
-The original me-PCR was developed as an enhanced version of the e-PCR program, adding multithreading capability and other improvements. This Python reimplementation (merPCR) retains all functionality while providing modern programming practices and a clean, type-safe codebase.
+The original me-PCR was developed as an enhanced version of the e-PCR program, adding multithreading capability and other improvements. This Python reimplementation (merPCR) retains all functionality while providing modern programming practices, a clean modular architecture, and comprehensive testing.
+
+## ✅ Verification with me-PCR
+
+This implementation has been thoroughly tested against the original me-PCR and produces identical results:
+
+- **Algorithm accuracy**: Matches me-PCR output exactly on test data
+- **Parameter compatibility**: All command-line options work identically  
+- **Performance**: Comparable search performance with improved code maintainability
+- **Comprehensive testing**: Includes both unit tests and integration tests with real genomic data
 
 ## Features
 
@@ -20,22 +29,42 @@ The original me-PCR was developed as an enhanced version of the e-PCR program, a
 
 ## Installation
 
+### From Source
+
 ```bash
 # Clone the repository
 git clone https://github.com/yourusername/merpcr.git
 cd merpcr
 
-# Install requirements
-pip install -r requirements.txt
+# Install in development mode
+pip install -e .
 
-# Make the script executable
-chmod +x merPCR.py
+# Or install directly
+pip install .
+```
+
+### For Development
+
+```bash
+# Install with development dependencies
+pip install -e ".[dev]"
 ```
 
 ## Usage
 
+After installation, you can use merPCR in several ways:
+
+### Command Line
+
 ```bash
-./merPCR.py [options] sts_file fasta_file
+# Using the installed command
+merpcr [options] sts_file fasta_file
+
+# Using the script directly  
+./scripts/merpcr [options] sts_file fasta_file
+
+# As a Python module
+python -m merpcr [options] sts_file fasta_file
 ```
 
 ### Arguments
@@ -111,10 +140,88 @@ Where:
 ## Example
 
 ```bash
-./merPCR.py -M 50 -N 1 -W 11 -T 4 -I 1 -O results.txt sts_markers.txt genome.fa
+merpcr -M 50 -N 1 -W 11 -T 4 -I 1 -O results.txt sts_markers.txt genome.fa
 ```
 
 This runs merPCR with a margin of 50, allowing 1 mismatch, using word size 11, 4 threads, with IUPAC support, and writing results to results.txt.
+
+### Python API
+
+```python
+from merpcr import MerPCR
+
+# Initialize with custom parameters
+mer_pcr = MerPCR(
+    wordsize=11,
+    margin=50,
+    mismatches=1,
+    threads=4,
+    iupac_mode=1
+)
+
+# Load data and search
+mer_pcr.load_sts_file("sts_markers.txt")
+fasta_records = mer_pcr.load_fasta_file("genome.fa")
+hit_count = mer_pcr.search(fasta_records, "results.txt")
+```
+
+## Testing
+
+merPCR includes comprehensive test suites to ensure accuracy and reliability:
+
+### Quick Test Commands
+
+```bash
+# Run all tests
+make test
+
+# Run unit tests only  
+make test-unit
+
+# Run integration tests
+make test-integration
+
+# Run performance benchmarks
+make test-performance
+
+# Generate coverage report
+make coverage
+```
+
+### Using pytest directly
+
+```bash
+# All tests
+pytest
+
+# Specific test categories
+pytest -m unit          # Unit tests only
+pytest -m integration   # Integration tests only
+pytest -m performance   # Performance tests only
+pytest -m cli          # CLI tests only
+
+# Verbose output
+pytest -v
+
+# With coverage
+pytest --cov=src/merpcr --cov-report=html
+```
+
+### Test Categories
+
+- **Unit Tests** (`tests/test_core_models.py`, `tests/test_engine_internals.py`): Test individual components and functions
+- **Integration Tests** (`tests/test_comprehensive.py`): End-to-end testing with real data from me-PCR test suite
+- **I/O Tests** (`tests/test_io_modules.py`): Test file loading and parsing functionality
+- **CLI Tests** (`tests/test_cli.py`): Test command-line interface and parameter handling
+- **Performance Tests** (`tests/test_performance.py`): Benchmarking and scalability testing
+
+The comprehensive tests use actual data from the original me-PCR test suite and verify:
+- Exact match with me-PCR output format
+- Parameter validation and bounds checking
+- IUPAC ambiguity code support
+- Threading behavior and performance
+- Memory efficiency
+- Error handling and edge cases
 
 ## Troubleshooting
 
@@ -135,7 +242,32 @@ This runs merPCR with a margin of 50, allowing 1 mismatch, using word size 11, 4
 Use the `--debug` flag to get detailed information about the run:
 
 ```bash
-./merPCR.py --debug sts_file.txt genome.fa
+merpcr --debug sts_file.txt genome.fa
+```
+
+## Project Structure
+
+```
+merpcr/
+├── src/merpcr/          # Main package
+│   ├── __init__.py      # Package exports
+│   ├── __main__.py      # Module entry point
+│   ├── cli.py           # Command-line interface
+│   ├── core/            # Core functionality
+│   │   ├── engine.py    # Main search engine
+│   │   ├── models.py    # Data models
+│   │   └── utils.py     # Utility functions
+│   └── io/              # Input/output modules
+│       ├── fasta.py     # FASTA file handling
+│       └── sts.py       # STS file handling
+├── tests/               # Test suite
+│   ├── data/            # Test data files
+│   ├── test_basic.py    # Basic unit tests
+│   └── test_comprehensive.py  # Integration tests
+├── scripts/             # Entry point scripts
+├── docs/                # Documentation
+├── pyproject.toml       # Modern Python packaging
+└── README.md            # This file
 ```
 
 ## License
