@@ -1,45 +1,45 @@
-# GitHub Actions CI/CD Setup
+# Continuous Integration and Deployment Infrastructure
 
-This document explains the GitHub Actions workflows configured for the merPCR project.
+This document provides technical specifications for the GitHub Actions automation workflows implemented for the merPCR project.
 
-## Workflows Overview
+## Workflow Architecture
 
-### 1. Continuous Integration (`ci.yml`)
-**Triggers**: Push to main/develop branches, Pull requests
-**Features**:
-- Matrix testing across Python 3.9-3.12 on Ubuntu, macOS, Windows
-- Automatic test data creation for missing files
-- Test categorization: unit, integration, CLI, performance
-- Coverage reporting with Codecov integration
-- Performance benchmarking (on push/schedule only)
+### 1. Continuous Integration Pipeline (`ci.yml`)
+**Activation Triggers**: Repository push events to main/develop branches, Pull request submissions
+**Technical Capabilities**:
+- Cross-platform validation matrix spanning Python 3.8-3.12 across Ubuntu, macOS, and Windows environments
+- Automated test dataset generation for missing reference files
+- Systematic test categorization: unit validation, integration testing, CLI verification, performance benchmarking
+- Code coverage analysis with Codecov reporting integration
+- Computational performance regression testing (activated on push/scheduled intervals)
 
-### 2. Code Quality (`code-quality.yml`)
-**Triggers**: Push to main/develop branches, Pull requests
-**Features**:
-- Code linting with flake8
-- Code formatting verification with black and isort
-- Type checking with mypy (non-blocking)
-- Security scanning with bandit
-- Dependency vulnerability checking with safety
-- Documentation validation
-- Auto-formatting on pull requests (requires write permissions)
+### 2. Code Quality Assurance (`code-quality.yml`)
+**Activation Triggers**: Repository modifications to main/develop branches, Pull request events
+**Quality Control Features**:
+- Static code analysis via flake8 linting framework
+- Code standardization verification using black and isort formatters
+- Type annotation validation through mypy analysis (advisory mode)
+- Security vulnerability assessment via bandit scanning
+- Dependency security evaluation using safety auditing tools
+- Documentation consistency validation
+- Automated code formatting on pull request submissions (requires repository write permissions)
 
-### 3. Security (`security.yml`)
-**Triggers**: Push to main/develop, Pull requests, Weekly schedule
-**Features**:
-- Comprehensive security scanning with bandit, safety, pip-audit
-- GitHub CodeQL analysis
-- Dependency review for pull requests
-- Secret detection with TruffleHog
-- License compatibility checking
+### 3. Security Assessment Framework (`security.yml`)
+**Activation Triggers**: Repository updates to main/develop branches, Pull request submissions, Weekly automated schedule
+**Security Capabilities**:
+- Multi-layered security analysis utilizing bandit, safety, and pip-audit tools
+- GitHub CodeQL semantic code analysis
+- Dependency vulnerability assessment for pull request modifications
+- Credential and secret detection through TruffleHog scanning
+- Software license compatibility verification
 
-### 4. Release (`release.yml`)
-**Triggers**: Git tags starting with 'v', Manual workflow dispatch
-**Features**:
-- Full test suite validation before release
-- Package building and validation
-- Automated GitHub releases
-- PyPI publishing (requires PYPI_API_TOKEN secret)
+### 4. Release Management Pipeline (`release.yml`)
+**Activation Triggers**: Git tag creation with 'v' prefix, Manual workflow dispatch
+**Release Features**:
+- Comprehensive test suite validation prior to package creation
+- Distribution package construction and integrity validation
+- Automated GitHub release generation with metadata
+- PyPI distribution publishing (requires PYPI_API_TOKEN authentication)
 
 ## Configuration Files
 
@@ -84,22 +84,22 @@ This document explains the GitHub Actions workflows configured for the merPCR pr
 ### Automatic Secrets:
 - `GITHUB_TOKEN`: Automatically provided by GitHub Actions
 
-## Test Categories
+## Test Classification Framework
 
-The CI system recognizes these pytest markers:
-- `unit`: Unit tests for individual components
-- `integration`: End-to-end tests with real data
-- `cli`: Command-line interface tests  
-- `performance`: Performance and scalability benchmarks
-- `slow`: Long-running tests (can be skipped)
+The continuous integration system implements the following pytest marker taxonomy:
+- `unit`: Isolated component validation tests
+- `integration`: End-to-end workflow validation using authentic datasets
+- `cli`: Command-line interface functionality verification
+- `performance`: Computational efficiency and scalability benchmarking
+- `slow`: Extended-duration tests (optionally excluded for rapid validation)
 
-## Performance Optimizations
+## Computational Optimizations
 
 ### CI Environment Adaptations:
-- Performance tests use smaller datasets in CI
-- Automatic output redirection to prevent console spam
-- Environment variable detection (`CI`, `GITHUB_ACTIONS`)
-- Timeout protections for long-running tests
+- Performance validation utilizes reduced datasets for CI environment compatibility
+- Automated output management to minimize console verbosity
+- Environment variable detection for CI/CD context awareness (`CI`, `GITHUB_ACTIONS`)
+- Execution timeout safeguards for extended-duration test procedures
 
 ## Usage Examples
 
@@ -128,17 +128,17 @@ gh run list
 
 ## Troubleshooting
 
-### Common Issues:
-1. **Test failures**: Check test data creation in CI logs
-2. **Permission errors**: Ensure repository has required secrets
-3. **Coverage upload failures**: Check CODECOV_TOKEN configuration
-4. **Release failures**: Verify PYPI_API_TOKEN and tag format
+### Common Diagnostic Issues:
+1. **Test execution failures**: Examine test dataset generation procedures in CI execution logs
+2. **Authentication failures**: Confirm repository secret configuration completeness
+3. **Coverage reporting failures**: Validate CODECOV_TOKEN authentication configuration
+4. **Release deployment failures**: Verify PYPI_API_TOKEN credentials and tag format compliance
 
-### Debug Steps:
-1. Check workflow logs in GitHub Actions tab
-2. Run tests locally with same environment
-3. Verify all secrets are configured
-4. Check branch protection rules
+### Systematic Debugging Protocol:
+1. Examine detailed workflow execution logs via GitHub Actions interface
+2. Replicate test execution in local environment matching CI specifications
+3. Confirm complete authentication secret configuration
+4. Validate branch protection rule compliance
 
 ## Maintenance
 
@@ -154,4 +154,4 @@ gh run list
 - Test coverage changes
 - Dependency updates
 
-This CI/CD setup ensures code quality, security, and reliability across all supported platforms and Python versions.
+This comprehensive CI/CD infrastructure ensures systematic code quality assurance, security validation, and operational reliability across all supported computational platforms and Python version specifications.

@@ -211,12 +211,13 @@ class TestMerPCRComprehensive(unittest.TestCase):
             line = lines[0].strip()
             parts = line.split("\t")
 
-            # Format: sequence_label    pos1..pos2    sts_id    (orientation)
-            self.assertEqual(len(parts), 4)
+            # Format: sequence_label    pos1..pos2    sts_id    alias    (orientation)
+            self.assertEqual(len(parts), 5)
             self.assertEqual(parts[0], "L78833")  # sequence label
             self.assertTrue(".." in parts[1])  # position range
             self.assertEqual(parts[2], "AFM248yg9")  # STS ID
-            self.assertEqual(parts[3], "(-)")  # orientation
+            self.assertEqual(parts[3], "(D17S932)  Chr.17, 63.7 cM")  # alias
+            self.assertEqual(parts[4], "(-)")  # orientation
 
         finally:
             os.unlink(output_file)
