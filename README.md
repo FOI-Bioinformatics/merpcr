@@ -1,6 +1,10 @@
-# merPCR - Modern Electronic PCR Implementation
-
-A Python reimplementation of the me-PCR (Multithreaded Electronic PCR) program, originally developed by Gregory Schuler at NCBI and subsequently enhanced by Kevin Murphy at Children's Hospital of Philadelphia.
+<div align="center">
+  <img src="assets/images/merPCR_logo.png" alt="merPCR Logo" width="400">
+  
+  # merPCR - Modern Electronic PCR Implementation
+  
+  A Python reimplementation of the me-PCR (Multithreaded Electronic PCR) program, originally developed by Gregory Schuler at NCBI and subsequently enhanced by Kevin Murphy at Children's Hospital of Philadelphia.
+</div>
 
 ## Overview
 
