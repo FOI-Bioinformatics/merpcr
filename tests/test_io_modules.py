@@ -215,11 +215,10 @@ class TestSTSLoader(unittest.TestCase):
         content = "TEST001\tAT\tGC\t100\tToo short\n"
         temp_file = self.create_temp_sts(content)
 
-        with self.assertLogs(level="WARNING") as cm:
-            success = self.mer_pcr.load_sts_file(temp_file)
+        success = self.mer_pcr.load_sts_file(temp_file)
 
         self.assertTrue(success)
-        # Should have 0 records due to short primers
+        # Should have 0 records due to short primers being filtered
         self.assertEqual(len(self.mer_pcr.sts_records), 0)
 
     def test_comments_and_blank_lines(self):

@@ -290,8 +290,8 @@ class DependencyValidator:
         platform_issues = 0
         
         # Check Python version compatibility
-        if sys.version_info < (3, 8):
-            print(f"  ⚠️ Python {sys.version_info.major}.{sys.version_info.minor} may not be fully supported (recommend 3.8+)")
+        if sys.version_info < (3, 11):
+            print(f"  ⚠️ Python {sys.version_info.major}.{sys.version_info.minor} is not supported (requires 3.11+)")
             platform_issues += 1
         else:
             print(f"  ✓ Python {sys.version_info.major}.{sys.version_info.minor} version OK")
@@ -355,7 +355,7 @@ class DependencyValidator:
         
         self.validation_results["summary"]["platform_issues"] = platform_issues
         self.validation_results["compatibility"] = {
-            "python_version_ok": sys.version_info >= (3, 8),
+            "python_version_ok": sys.version_info >= (3, 11),
             "filesystem_ok": platform_issues == 0,
             "multiprocessing_ok": platform_issues == 0,
             "platform_issues": platform_issues
