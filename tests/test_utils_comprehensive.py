@@ -3,14 +3,9 @@ Comprehensive tests for utility functions with full coverage.
 """
 
 import pytest
-from merpcr.core.utils import (
-    reverse_complement,
-    hash_value,
-    init_iupac_tables,
-    AMBIG,
-    _scode,
-    _compl
-)
+
+from merpcr.core.utils import (AMBIG, _compl, _scode, hash_value,
+                               init_iupac_tables, reverse_complement)
 
 
 class TestReverseComplement:
@@ -121,7 +116,7 @@ class TestHashValue:
     def test_different_wordsizes(self):
         """Test different word sizes."""
         primer = "ATCGATCG"
-        
+
         # Test various word sizes
         for wordsize in [3, 4, 5, 6, 7, 8]:
             offset, hash_val = hash_value(primer, wordsize)
@@ -135,12 +130,12 @@ class TestHashValue:
         """Test that different sequences produce different hashes."""
         primers = ["ATCG", "GCTA", "TTTT", "AAAA", "CGCG"]
         hashes = []
-        
+
         for primer in primers:
             offset, hash_val = hash_value(primer, 4)
             if offset >= 0:
                 hashes.append(hash_val)
-        
+
         # All valid hashes should be unique for these sequences
         assert len(hashes) == len(set(hashes))
 
@@ -148,11 +143,11 @@ class TestHashValue:
         """Test that ambiguous bases are properly skipped."""
         test_cases = [
             ("NATCG", 3, 1),  # Skip N at start
-            ("ATNCG", 3, -1), # N in middle, no valid hash
+            ("ATNCG", 3, -1),  # N in middle, no valid hash
             ("ATCGN", 3, 0),  # N at end, hash at start
             ("RATCG", 3, 1),  # Skip R (ambiguous)
         ]
-        
+
         for primer, wordsize, expected_offset in test_cases:
             offset, hash_val = hash_value(primer, wordsize)
             if expected_offset == -1:
@@ -166,11 +161,11 @@ class TestHashValue:
         offset, hash_val = hash_value("ATG", 3)
         assert offset == 0
         assert hash_val > 0
-        
+
         # Empty primer
         offset, hash_val = hash_value("", 3)
         assert offset == -1
-        
+
         # Single base
         offset, hash_val = hash_value("A", 3)
         assert offset == -1
@@ -198,7 +193,7 @@ class TestIUPACTables:
         """Test when IUPAC mode is enabled."""
         tables = init_iupac_tables(True)
         assert len(tables) > 0
-        
+
         # Check standard bases
         assert tables["A"] == "A"
         assert tables["C"] == "C"
@@ -209,7 +204,7 @@ class TestIUPACTables:
     def test_iupac_ambiguous_codes(self):
         """Test IUPAC ambiguous code mappings."""
         tables = init_iupac_tables(True)
-        
+
         # Test ambiguous codes
         assert "A" in tables["R"]  # R = A or G
         assert "G" in tables["R"]
@@ -221,12 +216,12 @@ class TestIUPACTables:
     def test_iupac_case_handling(self):
         """Test case handling in IUPAC tables."""
         tables = init_iupac_tables(True)
-        
+
         # Test that both upper and lower case are present
         assert "A" in tables
         assert "a" in tables
         assert tables["A"] == tables["a"]
-        
+
         assert "R" in tables
         assert "r" in tables
         assert tables["R"] == tables["r"]
@@ -234,12 +229,12 @@ class TestIUPACTables:
     def test_iupac_complex_codes(self):
         """Test complex IUPAC codes."""
         tables = init_iupac_tables(True)
-        
+
         # Test that complex codes contain expected bases
         assert "C" in tables["B"]  # B = C, G, T
         assert "G" in tables["B"]
         assert "T" in tables["B"]
-        
+
         assert "N" in tables["N"]  # N = any base
         assert len(tables["N"]) > 10  # Should contain many bases
 
@@ -296,11 +291,20 @@ class TestComplLookupTable:
     def test_compl_ambiguous_mapping(self):
         """Test ambiguous base complement mappings."""
         expected_complements = {
-            "R": "Y", "Y": "R", "M": "K", "K": "M",
-            "S": "S", "W": "W", "B": "V", "V": "B",
-            "D": "H", "H": "D", "N": "N", "X": "X"
+            "R": "Y",
+            "Y": "R",
+            "M": "K",
+            "K": "M",
+            "S": "S",
+            "W": "W",
+            "B": "V",
+            "V": "B",
+            "D": "H",
+            "H": "D",
+            "N": "N",
+            "X": "X",
         }
-        
+
         for base, complement in expected_complements.items():
             assert _compl[base] == complement
             assert _compl[base.lower()] == complement.lower()
@@ -313,10 +317,10 @@ class TestUtilsIntegration:
         """Test that hash works correctly with reverse complements."""
         primer = "ATCGATCG"
         rev_comp = reverse_complement(primer)
-        
+
         offset1, hash1 = hash_value(primer, 6)
         offset2, hash2 = hash_value(rev_comp, 6)
-        
+
         # Both should produce valid hashes
         assert offset1 >= 0
         assert offset2 >= 0
@@ -329,7 +333,7 @@ class TestUtilsIntegration:
         # Even though hash_value doesn't use IUPAC tables directly,
         # test that IUPAC tables contain sequences that would be hashable
         tables = init_iupac_tables(True)
-        
+
         # Test that standard bases in IUPAC tables can be hashed
         test_sequences = ["ATCG", "GCTA", "TACG", "CGAT"]  # Use mixed sequences
         for test_seq in test_sequences:

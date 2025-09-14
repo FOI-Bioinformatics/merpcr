@@ -23,42 +23,42 @@ def convert_mepcr_arguments(args: List[str]) -> List[str]:
     while i < len(args):
         arg = args[i]
         # Check for me-PCR style arguments (X=value)
-        if len(arg) >= 3 and arg[1] == '=' and arg[0] in 'MNWXTQZISOP':
+        if len(arg) >= 3 and arg[1] == "=" and arg[0] in "MNWXTQZISOP":
             param = arg[0]
             value = arg[2:]
-            
+
             # Convert to argparse format
-            if param == 'M':
-                converted_args.extend(['-M', value])
-            elif param == 'N':
-                converted_args.extend(['-N', value])
-            elif param == 'W':
-                converted_args.extend(['-W', value])
-            elif param == 'X':
-                converted_args.extend(['-X', value])
-            elif param == 'T':
-                converted_args.extend(['-T', value])
-            elif param == 'Q':
-                converted_args.extend(['-Q', value])
-            elif param == 'Z':
-                converted_args.extend(['-Z', value])
-            elif param == 'I':
-                converted_args.extend(['-I', value])
-            elif param == 'S':
-                converted_args.extend(['-S', value])
-            elif param == 'O':
-                converted_args.extend(['-O', value])
-            elif param == 'P':
+            if param == "M":
+                converted_args.extend(["-M", value])
+            elif param == "N":
+                converted_args.extend(["-N", value])
+            elif param == "W":
+                converted_args.extend(["-W", value])
+            elif param == "X":
+                converted_args.extend(["-X", value])
+            elif param == "T":
+                converted_args.extend(["-T", value])
+            elif param == "Q":
+                converted_args.extend(["-Q", value])
+            elif param == "Z":
+                converted_args.extend(["-Z", value])
+            elif param == "I":
+                converted_args.extend(["-I", value])
+            elif param == "S":
+                converted_args.extend(["-S", value])
+            elif param == "O":
+                converted_args.extend(["-O", value])
+            elif param == "P":
                 # P parameter is Mac-specific priority, ignore for now
                 pass
-        elif arg == '-help':
+        elif arg == "-help":
             # Convert me-PCR help to standard help
-            converted_args.append('--help')
+            converted_args.append("--help")
         else:
             # Keep all other arguments as is
             converted_args.append(arg)
         i += 1
-    
+
     return converted_args
 
 
@@ -218,7 +218,7 @@ def main() -> int:
     """Main function to run the merPCR program."""
     # Convert me-PCR style arguments to argparse format
     converted_argv = convert_mepcr_arguments(sys.argv[1:])
-    
+
     parser = create_parser()
     args = parser.parse_args(converted_argv)
 
