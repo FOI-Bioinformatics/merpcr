@@ -1,6 +1,6 @@
-# Examples and Tutorials
+# Methodological Examples and Implementation Tutorials
 
-This document provides practical examples and step-by-step tutorials for using merPCR in various scenarios.
+This document presents practical implementation examples and systematic tutorials for merPCR deployment across diverse analytical scenarios.
 
 ## Table of Contents
 
@@ -13,70 +13,70 @@ This document provides practical examples and step-by-step tutorials for using m
 7. [Python API Examples](#python-api-examples)
 8. [Real-World Case Studies](#real-world-case-studies)
 
-## Basic Examples
+## Fundamental Implementation Examples
 
-### Example 1: Simple Search
+### Example 1: Standard Chromosomal Analysis
 
-**Scenario**: Search for a few known STSs in a single chromosome.
+**Analytical Context**: Detection of defined STS markers within individual chromosomal sequences.
 
-**Data**: 
-- `markers.sts`: 5 STS markers
-- `chr21.fa`: Human chromosome 21
+**Input Data**: 
+- `markers.sts`: Collection of 5 characterized STS markers
+- `chr21.fa`: Human chromosome 21 genomic sequence
 
-**Command**:
+**Execution Command**:
 ```bash
 merpcr markers.sts chr21.fa
 ```
 
-**Expected Output**:
+**Representative Output**:
 ```
 chr21	14400000..14400150	D21S11	(+)
 chr21	25600000..25600200	D21S1435	(-)
 ```
 
-### Example 2: Permissive Search
+### Example 2: Relaxed Parameter Analysis
 
-**Scenario**: Search with relaxed parameters to find more matches.
+**Analytical Context**: Enhanced detection sensitivity through permissive search parameters.
 
-**Command**:
+**Execution Command**:
 ```bash
 merpcr -M 100 -N 2 -X 0 markers.sts chr21.fa
 ```
 
-**Use Case**: When working with:
-- Divergent species
-- Low-quality sequence data
-- Degenerate primers
+**Applicable Scenarios**:
+- Phylogenetically divergent species analysis
+- Low-quality or fragmented genomic sequences
+- Degenerate or ambiguous primer sequences
 
-### Example 3: Performance-Optimized
+### Example 3: High-Performance Computing Implementation
 
-**Scenario**: Fast search of large genome with multiple cores.
+**Analytical Context**: Optimized computational approach for large-scale genomic analysis.
 
-**Command**:
+**Execution Command**:
 ```bash
 merpcr -W 12 -T 8 -Q 1 -O results.txt markers.sts whole_genome.fa
 ```
 
-**Benefits**:
-- Faster execution with 8 threads
-- Larger word size for speed
-- Quiet mode for clean output
+**Performance Optimizations**:
+- Parallel processing utilizing 8 computational threads
+- Enhanced hash word size for improved algorithmic efficiency
+- Minimized logging output for streamlined execution
 
-## Tutorial 1: First-Time Setup
+## Tutorial 1: Initial Implementation Protocol
 
-This tutorial walks you through your first merPCR analysis from start to finish.
+This tutorial provides systematic guidance for initial merPCR implementation and validation.
 
-### Step 1: Install merPCR
+### Step 1: Software Installation and Configuration
 
 ```bash
-# Clone the repository
+# Repository acquisition
 git clone https://github.com/yourusername/merpcr.git
 cd merpcr
 
-# Install in development mode
+# Development environment installation
 pip install -e .
 
-# Verify installation
+# Installation validation
 merpcr --version
 ```
 

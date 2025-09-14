@@ -63,36 +63,36 @@ Sequence-Tagged Sites (STS) are short DNA sequences that occur only once in the 
 
 ## Preparing Your Data
 
-### STS File Format
+### STS Marker File Specification
 
-Create a tab-delimited text file with this structure:
+Construct tab-delimited input files using the following format:
 
 ```
-ID	Primer1	Primer2	PCR_Size	[Alias]
+Identifier	Forward_Primer	Reverse_Primer	Amplicon_Size	[Annotation]
 ```
 
-**Example**:
+**Representative Examples**:
 ```
 D1S2893	TGAGTCAGATGTTTGATTTTG	ATGCCACATCAACTTATACTG	126	1p36.33
 D1S468	GAATGAACAGAGATGATGCCT	CACACACACACACACCACAC	142-148	1p36.22
 AFM248yg9	GCTAAAAATACACGGATGG	TGCAAGACTGCGTCTC	193	(D17S932) Chr.17, 63.7 cM
 ```
 
-**Field Details**:
-- **ID**: Unique identifier (no spaces, use underscores)
-- **Primer1**: Forward primer sequence (DNA bases A, T, C, G, plus IUPAC codes if enabled)
-- **Primer2**: Reverse primer sequence
-- **PCR_Size**: Expected product size in base pairs
-  - Single number: `200`
-  - Range: `150-250` (will use average: 200)
-- **Alias**: Optional description (can contain spaces and special characters)
+**Field Specifications**:
+- **Identifier**: Unique STS designation (alphanumeric characters and underscores)
+- **Forward_Primer**: 5' to 3' sequence of the forward amplification primer (IUPAC nucleotide codes supported)
+- **Reverse_Primer**: 5' to 3' sequence of the reverse amplification primer
+- **Amplicon_Size**: Predicted PCR product size in base pairs
+  - Single value: `200`
+  - Range notation: `150-250` (system calculates mean value: 200)
+- **Annotation**: Optional descriptive metadata (supports spaces and special characters)
 
-**Important Notes**:
-- Use tabs, not spaces, as separators
-- Lines starting with `#` are treated as comments
-- Blank lines are ignored
-- Primer sequences should be in 5' to 3' orientation
-- PCR_Size should not include the primers themselves
+**Format Requirements**:
+- Utilize tab characters for field separation (not spaces)
+- Lines prefixed with `#` are interpreted as comments
+- Empty lines are ignored during processing
+- Primer sequences must be specified in 5' to 3' orientation
+- Amplicon size excludes primer sequences themselves
 
 ### FASTA File Format
 

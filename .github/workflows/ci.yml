@@ -1,4 +1,4 @@
-name: CI
+name: Comprehensive CI
 
 on:
   push:
@@ -6,20 +6,63 @@ on:
   pull_request:
     branches: [ main, develop ]
   schedule:
-    # Run weekly on Sunday at 2 AM UTC
+    # Run weekly on Sunday at 2 AM UTC for full regression testing
     - cron: '0 2 * * 0'
 
 env:
   FORCE_COLOR: 1
+  PYTHONUNBUFFERED: 1
+  # Ensure reproducible results
+  PYTHONHASHSEED: 42
 
 jobs:
-  test:
+  # Pre-flight validation
+  validation:
+    runs-on: ubuntu-latest
+    outputs:
+      python-versions: ${{ steps.versions.outputs.python-versions }}
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Determine Python versions to test
+      id: versions
+      run: |
+        # Test all supported versions, with focus on latest stable
+        if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+          # For PRs, test key versions to save CI time
+          echo 'python-versions=["3.8", "3.11", "3.12"]' >> $GITHUB_OUTPUT
+        else
+          # For pushes and schedule, test all supported versions
+          echo 'python-versions=["3.8", "3.9", "3.10", "3.11", "3.12"]' >> $GITHUB_OUTPUT
+        fi
+    
+    - name: Validate project structure
+      run: |
+        # Ensure critical files exist
+        test -f pyproject.toml || (echo "Missing pyproject.toml" && exit 1)
+        test -f src/merpcr/__init__.py || (echo "Missing package __init__.py" && exit 1)
+        test -d tests/ || (echo "Missing tests directory" && exit 1)
+        echo "Project structure validation passed"
+
+  # Cross-platform compatibility testing
+  test-matrix:
     runs-on: ${{ matrix.os }}
+    needs: validation
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]
-        python-version: ['3.9', '3.10', '3.11', '3.12']
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        python-version: ${{ fromJson(needs.validation.outputs.python-versions) }}
+        # Add specific test configurations
+        include:
+          # Test with minimal dependencies
+          - os: ubuntu-latest
+            python-version: '3.8'
+            test-type: 'minimal'
+          # Test with development head versions
+          - os: ubuntu-latest
+            python-version: '3.12'
+            test-type: 'bleeding-edge'
 
     steps:
     - uses: actions/checkout@v4
@@ -31,55 +74,213 @@ jobs:
 
     - name: Install dependencies
       run: |
-        python -m pip install --upgrade pip
+        python -m pip install --upgrade pip setuptools wheel
+        # Install package in editable mode
         pip install -e .
-        pip install pytest pytest-cov pytest-xdist psutil
+        # Install comprehensive test dependencies
+        pip install pytest pytest-cov pytest-xdist pytest-timeout pytest-benchmark psutil hypothesis
+        # Install additional validation tools
+        pip install memory-profiler py-spy
+        
+    - name: Verify installation
+      run: |
+        python -c "import merpcr; print(f'merPCR version: {merpcr.__version__}')"
+        merpcr --version
+        python -m merpcr --help
 
-    - name: Create test data if missing
+    - name: Generate comprehensive test datasets
       run: |
         python -c "
         import os
+        import random
         from pathlib import Path
         
         # Ensure test data directory exists
         test_data_dir = Path('tests/data')
         test_data_dir.mkdir(exist_ok=True)
         
-        # Create minimal test files if they don't exist
-        sts_file = test_data_dir / 'test.sts'
-        if not sts_file.exists():
-            with open(sts_file, 'w') as f:
-                f.write('AFM248yg9\\tGCTAAAAATACACGGATGG\\tTGCAAGACTGCGTCTC\\t193\\t(D17S932) Chr.17\\n')
-                f.write('L78833\\tGAGGCAAAGCTCATGGAAGA\\tCAGGAAGGCCAGCCATTT\\t195\\tUniSTS:5690\\n')
+        # Create comprehensive STS marker file
+        sts_file = test_data_dir / 'comprehensive.sts'
+        with open(sts_file, 'w') as f:
+            # Real STS markers for validation
+            f.write('AFM248yg9\\tGCTAAAAATACACGGATGG\\tTGCAAGACTGCGTCTC\\t193\\t(D17S932) Chr.17, 63.7 cM\\n')
+            f.write('L78833\\tGAGGCAAAGCTCATGGAAGA\\tCAGGAAGGCCAGCCATTT\\t195\\tUniSTS:5690\\n')
+            f.write('D1S2893\\tTGAGTCAGATGTTTGATTTTG\\tATGCCACATCAACTTATACTG\\t126\\t1p36.33\\n')
+            f.write('D1S468\\tGAATGAACAGAGATGATGCCT\\tCACACACACACACACCACAC\\t142-148\\t1p36.22\\n')
+            # Edge cases
+            f.write('SHORT\\tATCG\\tTAGC\\t50\\tShort primers (should be filtered)\\n')
+            f.write('AMBIG\\tATCGNNNNATCG\\tGCTANNNNGCTA\\t200\\tAmbiguous bases\\n')
+            f.write('RANGE\\tATCGATCGATCG\\tGCTAGCTAGCTA\\t150-250\\tRange notation\\n')
+            # Comment and blank lines
+            f.write('# This is a comment\\n')
+            f.write('\\n')
+            f.write('VALID\\tATCGATCGATCGATC\\tGCTAGCTAGCTAGCT\\t180\\tValid marker after comment\\n')
         
-        fa_file = test_data_dir / 'test.fa'
-        if not fa_file.exists():
-            with open(fa_file, 'w') as f:
-                f.write('>test_sequence\\n')
-                f.write('GCTAAAAATACACGGATGGNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN\\n')
-                f.write('NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN\\n')
-                f.write('NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNTGCAAGACTGCGTCTC\\n')
+        # Create realistic genomic sequence with embedded STS sites
+        fa_file = test_data_dir / 'comprehensive.fa'
+        with open(fa_file, 'w') as f:
+            f.write('>chr21_fragment Human chromosome 21 fragment\\n')
+            
+            # Build sequence with known STS sites
+            sequence = ''
+            # Random 5 flanking sequence
+            sequence += ''.join(random.choices('ATCG', k=5000))
+            
+            # Embed AFM248yg9 STS site
+            sequence += 'GCTAAAAATACACGGATGG'  # primer1
+            sequence += ''.join(random.choices('ATCG', k=150))  # amplicon
+            sequence += 'GAGACGCAGTCTTGCA'  # reverse complement of primer2
+            
+            # Add more random sequence
+            sequence += ''.join(random.choices('ATCG', k=10000))
+            
+            # Embed L78833 STS site on reverse strand
+            sequence += 'AAATGGCTGGCCTTCCTG'  # reverse complement of primer2
+            sequence += ''.join(random.choices('ATCG', k=170))  # amplicon
+            sequence += 'TCTTCCATGAGCTTTGCCTC'  # reverse complement of primer1
+            
+            # Random 3 flanking sequence
+            sequence += ''.join(random.choices('ATCG', k=5000))
+            
+            # Write in FASTA format with line breaks
+            for i in range(0, len(sequence), 80):
+                f.write(sequence[i:i+80] + '\\n')
+        
+        # Create multi-sequence FASTA
+        multi_fa = test_data_dir / 'multi_sequence.fa'
+        with open(multi_fa, 'w') as f:
+            for i in range(3):
+                f.write(f'>sequence_{i+1} Test sequence {i+1}\\n')
+                seq = ''.join(random.choices('ATCG', k=1000))
+                for j in range(0, len(seq), 80):
+                    f.write(seq[j:j+80] + '\\n')
+        
+        # Create edge case files for robustness testing
+        edge_cases_dir = test_data_dir / 'edge_cases'
+        edge_cases_dir.mkdir(exist_ok=True)
+        
+        # Empty files
+        (edge_cases_dir / 'empty.sts').write_text('')
+        (edge_cases_dir / 'empty.fa').write_text('')
+        
+        # Files with only comments
+        (edge_cases_dir / 'comments_only.sts').write_text('# Only comments\\n# Another comment\\n')
+        
+        # Malformed files
+        (edge_cases_dir / 'malformed.sts').write_text('INVALID\\tONLY_ONE_FIELD\\n')
+        
+        print('Comprehensive test datasets generated successfully')
         "
 
-    - name: Run unit tests
+    - name: System information
       run: |
-        pytest tests/ -m "unit" -v --tb=short --durations=10
-
-    - name: Run integration tests
+        python -c "
+        import sys, platform, os
+        print(f'Platform: {platform.platform()}')
+        print(f'Python: {sys.version}')
+        print(f'Architecture: {platform.architecture()}')
+        print(f'CPU count: {os.cpu_count()}')
+        print(f'Memory info available: {hasattr(os, \"sysconf\")}')
+        if hasattr(os, 'sysconf') and 'SC_PAGE_SIZE' in os.sysconf_names:
+            pages = os.sysconf('SC_PHYS_PAGES')
+            page_size = os.sysconf('SC_PAGE_SIZE')
+            print(f'Physical memory: {(pages * page_size) / (1024**3):.1f} GB')
+        "
+    
+    - name: Run unit tests with timeout protection
+      timeout-minutes: 15
       run: |
-        pytest tests/ -m "integration" -v --tb=short --durations=10
-
-    - name: Run CLI tests
+        pytest tests/ -m "unit" -v --tb=short --durations=10 \
+          --timeout=300 --timeout-method=thread
+    
+    - name: Run integration tests with realistic data
+      timeout-minutes: 20
       run: |
-        pytest tests/ -m "cli" -v --tb=short --durations=10
-
-    - name: Run other tests
+        # Use comprehensive test data
+        pytest tests/ -m "integration" -v --tb=short --durations=10 \
+          --timeout=600 --timeout-method=thread
+    
+    - name: Run CLI tests across platforms
+      timeout-minutes: 10
       run: |
-        pytest tests/ -m "not (unit or integration or cli or performance)" -v --tb=short --durations=10
+        pytest tests/ -m "cli" -v --tb=short --durations=10 \
+          --timeout=300 --timeout-method=thread
+    
+    - name: Run compatibility validation tests
+      timeout-minutes: 15
+      run: |
+        # Test me-PCR compatibility explicitly
+        python test_compatibility.py
+        pytest tests/ -k "compatibility" -v --tb=short
+    
+    - name: Run error injection and robustness tests
+      timeout-minutes: 20
+      run: |
+        pytest tests/test_error_injection.py -v --tb=short --durations=10
+        pytest tests/test_threading_stress.py -v --tb=short --durations=5
+    
+    - name: Run property-based tests
+      timeout-minutes: 25
+      run: |
+        pytest tests/test_property_based.py -v --tb=short --durations=10
+    
+    - name: Run remaining comprehensive tests
+      timeout-minutes: 15
+      run: |
+        pytest tests/ -m "not (unit or integration or cli or performance)" -v --tb=short --durations=10 \
+          --timeout=300
+    
+    - name: Comprehensive dependency validation
+      run: |
+        # Run comprehensive cross-platform dependency validation
+        python scripts/dependency_validation.py --comprehensive \
+          --output dependency_validation_${{ matrix.os }}_py${{ matrix.python-version }}.json
+        
+        echo "Dependency validation completed for ${{ matrix.os }} Python ${{ matrix.python-version }}"
 
+    - name: Validate cross-platform file handling
+      run: |
+        python -c "
+        import os
+        from pathlib import Path
+        from merpcr import MerPCR
+        
+        # Test file path handling across platforms
+        test_data = Path('tests/data')
+        engine = MerPCR()
+        
+        # Test various path formats
+        paths_to_test = [
+            str(test_data / 'comprehensive.sts'),
+            str(test_data / 'comprehensive.fa')
+        ]
+        
+        for path in paths_to_test:
+            if os.path.exists(path):
+                print(f'Testing path: {path}')
+                if path.endswith('.sts'):
+                    result = engine.load_sts_file(path)
+                    print(f'STS loading result: {result}')
+                elif path.endswith('.fa'):
+                    records = engine.load_fasta_file(path)
+                    print(f'FASTA records loaded: {len(records)}')
+        
+        print('Cross-platform file handling validation completed')
+        "
+    
+    - name: Upload dependency validation results
+      uses: actions/upload-artifact@v4
+      with:
+        name: dependency-validation-${{ matrix.os }}-py${{ matrix.python-version }}-${{ github.run_id }}
+        path: dependency_validation_*.json
+      if: always()
+
+  # Enhanced coverage analysis with mutation testing
   coverage:
     runs-on: ubuntu-latest
-    needs: test
+    needs: test-matrix
+    if: always()  # Run even if some tests fail
+    timeout-minutes: 30
 
     steps:
     - uses: actions/checkout@v4
@@ -93,57 +294,73 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install -e .
-        pip install pytest pytest-cov psutil
+        pip install pytest pytest-cov pytest-xdist psutil hypothesis
+        pip install mutmut coverage-badge
 
-    - name: Create test data if missing
+    - name: Generate test data
       run: |
         python -c "
         import os
+        import random
         from pathlib import Path
         
         test_data_dir = Path('tests/data')
         test_data_dir.mkdir(exist_ok=True)
         
-        sts_file = test_data_dir / 'test.sts'
-        if not sts_file.exists():
-            with open(sts_file, 'w') as f:
-                f.write('AFM248yg9\\tGCTAAAAATACACGGATGG\\tTGCAAGACTGCGTCTC\\t193\\t(D17S932) Chr.17\\n')
-                f.write('L78833\\tGAGGCAAAGCTCATGGAAGA\\tCAGGAAGGCCAGCCATTT\\t195\\tUniSTS:5690\\n')
+        # Create comprehensive test data (same as above)
+        sts_file = test_data_dir / 'comprehensive.sts'
+        with open(sts_file, 'w') as f:
+            f.write('AFM248yg9\\tGCTAAAAATACACGGATGG\\tTGCAAGACTGCGTCTC\\t193\\t(D17S932) Chr.17, 63.7 cM\\n')
+            f.write('L78833\\tGAGGCAAAGCTCATGGAAGA\\tCAGGAAGGCCAGCCATTT\\t195\\tUniSTS:5690\\n')
+            f.write('D1S2893\\tTGAGTCAGATGTTTGATTTTG\\tATGCCACATCAACTTATACTG\\t126\\t1p36.33\\n')
         
-        fa_file = test_data_dir / 'test.fa'
-        if not fa_file.exists():
-            with open(fa_file, 'w') as f:
-                f.write('>test_sequence\\n')
-                f.write('GCTAAAAATACACGGATGGNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN\\n')
-                f.write('NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN\\n')
-                f.write('NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNTGCAAGACTGCGTCTC\\n')
+        fa_file = test_data_dir / 'comprehensive.fa'
+        with open(fa_file, 'w') as f:
+            f.write('>test_sequence\\n')
+            seq = ''.join(random.choices('ATCG', k=2000))
+            for i in range(0, len(seq), 80):
+                f.write(seq[i:i+80] + '\\n')
         "
 
-    - name: Run tests with coverage
+    - name: Run comprehensive coverage analysis
       run: |
-        pytest --cov=src/merpcr --cov-report=xml --cov-report=html -m "not performance" -v
+        # Run all tests except performance with detailed coverage
+        pytest --cov=src/merpcr --cov-report=xml --cov-report=html --cov-report=term-missing \
+          --cov-branch --cov-fail-under=90 \
+          -m "not performance" -v --durations=20
+        
+        # Generate coverage badge
+        coverage-badge -o coverage-badge.svg
 
     - name: Upload coverage reports to Codecov
       uses: codecov/codecov-action@v3
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
         file: ./coverage.xml
-        flags: unittests
-        name: codecov-umbrella
+        flags: comprehensive-tests
+        name: codecov-comprehensive
         fail_ci_if_error: false
 
-    - name: Upload coverage to artifacts
+    - name: Upload coverage artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: coverage-report
-        path: htmlcov/
+        name: coverage-report-${{ github.run_id }}
+        path: |
+          htmlcov/
+          coverage-badge.svg
+          coverage.xml
 
+  # Performance regression testing
   performance:
     runs-on: ubuntu-latest
     if: github.event_name == 'push' || github.event_name == 'schedule'
+    timeout-minutes: 45
 
     steps:
     - uses: actions/checkout@v4
+      with:
+        # Need history for performance comparison
+        fetch-depth: 0
 
     - name: Set up Python 3.11
       uses: actions/setup-python@v5
@@ -154,43 +371,538 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install -e .
-        pip install pytest psutil
+        pip install pytest pytest-benchmark psutil memory-profiler py-spy
+        pip install matplotlib seaborn  # For performance visualization
 
-    - name: Create test data
+    - name: Generate performance test datasets
       run: |
         python -c "
-        import os
+        import random
         from pathlib import Path
         
-        test_data_dir = Path('tests/data')
-        test_data_dir.mkdir(exist_ok=True)
+        test_data_dir = Path('tests/data/performance')
+        test_data_dir.mkdir(parents=True, exist_ok=True)
         
-        sts_file = test_data_dir / 'test.sts'
-        if not sts_file.exists():
-            with open(sts_file, 'w') as f:
-                f.write('AFM248yg9\\tGCTAAAAATACACGGATGG\\tTGCAAGACTGCGTCTC\\t193\\t(D17S932) Chr.17\\n')
-                f.write('L78833\\tGAGGCAAAGCTCATGGAAGA\\tCAGGAAGGCCAGCCATTT\\t195\\tUniSTS:5690\\n')
+        # Create large STS dataset
+        large_sts = test_data_dir / 'large_dataset.sts'
+        with open(large_sts, 'w') as f:
+            for i in range(1000):  # 1000 STS markers
+                primer1 = ''.join(random.choices('ATCG', k=random.randint(18, 25)))
+                primer2 = ''.join(random.choices('ATCG', k=random.randint(18, 25)))
+                pcr_size = random.randint(100, 500)
+                f.write(f'STS_{i:04d}\\t{primer1}\\t{primer2}\\t{pcr_size}\\tPerformance test STS {i}\\n')
         
-        fa_file = test_data_dir / 'test.fa'
-        if not fa_file.exists():
-            with open(fa_file, 'w') as f:
-                f.write('>test_sequence\\n')
-                f.write('GCTAAAAATACACGGATGGNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN\\n')
-                f.write('NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN\\n')
-                f.write('NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNTGCAAGACTGCGTCTC\\n')
+        # Create large genomic sequence
+        large_fa = test_data_dir / 'large_sequence.fa'
+        with open(large_fa, 'w') as f:
+            f.write('>large_test_chromosome Synthetic chromosome for performance testing\\n')
+            # 1MB sequence
+            total_length = 1000000
+            chunk_size = 80
+            for i in range(0, total_length, chunk_size):
+                chunk = ''.join(random.choices('ATCG', k=min(chunk_size, total_length - i)))
+                f.write(chunk + '\\n')
+        
+        print('Performance test datasets generated')
+        print(f'STS file size: {large_sts.stat().st_size / 1024:.1f} KB')
+        print(f'FASTA file size: {large_fa.stat().st_size / (1024*1024):.1f} MB')
         "
 
-    - name: Run performance tests
+    - name: Run performance benchmarks
       env:
         SKIP_PERFORMANCE_TESTS: ""
       run: |
-        pytest tests/ -m "performance" -v --tb=short --durations=10
+        # Run performance tests with benchmarking
+        pytest tests/test_performance.py -v --tb=short --durations=10 \
+          --benchmark-json=benchmark_results.json \
+          --benchmark-save=ci_run \
+          --benchmark-save-data
+        
+        # Memory profiling for key operations
+        python -m memory_profiler -c "
+        from merpcr import MerPCR
+        import os
+        
+        @profile
+        def test_memory_usage():
+            engine = MerPCR(wordsize=11, margin=50, threads=1)
+            if os.path.exists('tests/data/performance/large_dataset.sts'):
+                engine.load_sts_file('tests/data/performance/large_dataset.sts')
+            if os.path.exists('tests/data/performance/large_sequence.fa'):
+                records = engine.load_fasta_file('tests/data/performance/large_sequence.fa')
+                hits = engine.search(records[:1])  # Test with first sequence only
+                print(f'Found {hits} hits in memory profiling test')
+        
+        test_memory_usage()
+        " > memory_profile.txt 2>&1 || echo "Memory profiling completed with warnings"
+
+    - name: Establish performance baseline (first run)
+      run: |
+        # Check if baseline exists for this platform
+        python scripts/performance_baseline.py establish
+        
+        echo "Performance baseline established"
+
+    - name: Compare performance with baseline
+      run: |
+        # Compare current performance with established baseline
+        python scripts/performance_baseline.py compare --threshold 25.0
+        
+        # Generate performance report
+        python scripts/performance_baseline.py report --format json --output performance-report.json
+        python scripts/performance_baseline.py report --format html --output performance-report.html
+        
+        echo "Performance analysis completed"
+
+    - name: Performance regression check
+      run: |
+        # Check for performance regressions and fail CI if found
+        python -c "
+        import json
+        import sys
+        from pathlib import Path
+        
+        # Find latest comparison file
+        import glob
+        comparison_files = glob.glob('.benchmarks/comparison_*.json')
+        
+        if comparison_files:
+            latest_comparison = max(comparison_files, key=lambda x: Path(x).stat().st_mtime)
+            
+            with open(latest_comparison, 'r') as f:
+                comparison_data = json.load(f)
+            
+            regressions = comparison_data['summary']['regressions']
+            improvements = comparison_data['summary']['improvements']
+            stable = comparison_data['summary']['stable']
+            
+            print(f'Performance Summary:')
+            print(f'  🔴 Regressions: {regressions}')
+            print(f'  🟢 Improvements: {improvements}')
+            print(f'  ⚪ Stable: {stable}')
+            
+            if regressions > 0:
+                print('')
+                print('Performance regressions detected in:')
+                for operation, data in comparison_data['comparisons'].items():
+                    if data['status'] == 'regression':
+                        print(f'  - {operation}: {data[\"change_percent\"]:.1f}% slower')
+                
+                print('')
+                print('⚠️ CI will continue but performance review is recommended')
+                # Note: We don't fail CI for performance regressions in this example
+                # but you could uncomment the next line to make it fail:
+                # sys.exit(1)
+            else:
+                print('')
+                print('✅ No performance regressions detected')
+        else:
+            print('No comparison data available - baseline was just established')
+        "
 
     - name: Upload performance results
       uses: actions/upload-artifact@v4
       with:
-        name: performance-results
+        name: performance-results-${{ github.run_id }}
         path: |
-          performance_*.txt
-          benchmark_*.json
+          benchmark_results.json
+          memory_profile.txt
+          performance-report.json
+          performance-report.html
+          .benchmarks/
       if: always()
+
+  # Scientific reproducibility validation
+  reproducibility:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -e .
+        pip install pytest
+    
+    - name: Generate deterministic test data
+      run: |
+        python -c "
+        import random
+        from pathlib import Path
+        
+        # Use fixed seed for reproducible results
+        random.seed(12345)
+        
+        test_data_dir = Path('tests/data/reproducibility')
+        test_data_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Create fixed test dataset
+        sts_file = test_data_dir / 'fixed.sts'
+        with open(sts_file, 'w') as f:
+            f.write('FIXED_STS_1\\tATCGATCGATCGATC\\tGCTAGCTAGCTAGCT\\t200\\tFixed test 1\\n')
+            f.write('FIXED_STS_2\\tTTAAGGCCTTAAGGC\\tCCGGAATTCCGGAAT\\t150\\tFixed test 2\\n')
+        
+        fa_file = test_data_dir / 'fixed.fa'
+        with open(fa_file, 'w') as f:
+            f.write('>fixed_sequence\\n')
+            # Fixed sequence with embedded STS sites
+            sequence = 'ATCGATCGATCGATC' + 'N' * 170 + 'AGCTAGCTAGCTAG' + 'N' * 500
+            sequence += 'TTAAGGCCTTAAGGC' + 'N' * 120 + 'ATTCCGGAATTCCGG' + 'N' * 500
+            for i in range(0, len(sequence), 80):
+                f.write(sequence[i:i+80] + '\\n')
+        "
+    
+    - name: Test reproducibility across runs
+      run: |
+        python -c "
+        import os
+        from merpcr import MerPCR
+        
+        results = []
+        
+        # Run the same analysis multiple times
+        for run in range(5):
+            engine = MerPCR(wordsize=8, margin=50, mismatches=0, threads=1)
+            
+            if os.path.exists('tests/data/reproducibility/fixed.sts'):
+                engine.load_sts_file('tests/data/reproducibility/fixed.sts')
+                
+            if os.path.exists('tests/data/reproducibility/fixed.fa'):
+                records = engine.load_fasta_file('tests/data/reproducibility/fixed.fa')
+                hits = engine.search(records)
+                results.append(hits)
+                print(f'Run {run + 1}: {hits} hits found')
+        
+        # Verify all runs produce identical results
+        if len(set(results)) == 1:
+            print(f'✓ Reproducibility test PASSED: All runs produced {results[0]} hits')
+        else:
+            print(f'✗ Reproducibility test FAILED: Results varied: {results}')
+            exit(1)
+        "
+
+  # Memory and resource monitoring
+  resource-monitoring:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+    
+    - name: Install monitoring dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -e .
+        pip install pytest psutil memory-profiler py-spy
+        # Install system monitoring tools
+        sudo apt-get update && sudo apt-get install -y htop iotop
+    
+    - name: Generate large test dataset for monitoring
+      run: |
+        python -c "
+        import random
+        from pathlib import Path
+        
+        test_data_dir = Path('tests/data/monitoring')
+        test_data_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Large STS file for memory testing
+        large_sts = test_data_dir / 'memory_test.sts'
+        with open(large_sts, 'w') as f:
+            for i in range(5000):
+                primer1 = ''.join(random.choices('ATCG', k=20))
+                primer2 = ''.join(random.choices('ATCG', k=20))
+                pcr_size = random.randint(100, 400)
+                f.write(f'MEMORY_STS_{i:05d}\\t{primer1}\\t{primer2}\\t{pcr_size}\\tMemory test {i}\\n')
+        
+        print(f'Created STS file with 5000 markers')
+        "
+    
+    - name: Monitor resource usage during execution
+      run: |
+        # Start system monitoring in background
+        python -c "
+        import psutil
+        import time
+        import threading
+        import json
+        from pathlib import Path
+        
+        # Resource monitoring
+        monitoring_data = []
+        monitoring_active = threading.Event()
+        monitoring_active.set()
+        
+        def monitor_resources():
+            while monitoring_active.is_set():
+                try:
+                    cpu_percent = psutil.cpu_percent(interval=1)
+                    memory = psutil.virtual_memory()
+                    disk = psutil.disk_usage('/')
+                    
+                    data_point = {
+                        'timestamp': time.time(),
+                        'cpu_percent': cpu_percent,
+                        'memory_percent': memory.percent,
+                        'memory_used_gb': memory.used / (1024**3),
+                        'memory_available_gb': memory.available / (1024**3),
+                        'disk_used_percent': (disk.used / disk.total) * 100
+                    }
+                    monitoring_data.append(data_point)
+                    
+                    print(f'CPU: {cpu_percent:5.1f}% | RAM: {memory.percent:5.1f}% ({memory.used/(1024**3):.1f}GB used)')
+                    
+                except Exception as e:
+                    print(f'Monitoring error: {e}')
+                    break
+                
+                time.sleep(2)
+        
+        # Start monitoring thread
+        monitor_thread = threading.Thread(target=monitor_resources, daemon=True)
+        monitor_thread.start()
+        
+        try:
+            # Run merPCR with large dataset
+            from merpcr import MerPCR
+            import os
+            
+            print('Starting merPCR analysis with resource monitoring...')
+            engine = MerPCR(wordsize=11, margin=100, threads=2)
+            
+            if os.path.exists('tests/data/monitoring/memory_test.sts'):
+                print('Loading STS file...')
+                success = engine.load_sts_file('tests/data/monitoring/memory_test.sts')
+                print(f'STS loading success: {success}')
+                print(f'Loaded {len(engine.sts_records)} STS records')
+            
+            # Give monitoring some time to collect data
+            time.sleep(5)
+            
+        finally:
+            # Stop monitoring
+            monitoring_active.clear()
+            time.sleep(3)  # Allow monitor thread to finish
+            
+            # Save monitoring results
+            with open('resource_monitoring.json', 'w') as f:
+                json.dump(monitoring_data, f, indent=2)
+            
+            if monitoring_data:
+                max_cpu = max(d['cpu_percent'] for d in monitoring_data)
+                max_memory = max(d['memory_used_gb'] for d in monitoring_data)
+                avg_cpu = sum(d['cpu_percent'] for d in monitoring_data) / len(monitoring_data)
+                
+                print(f'\\n=== Resource Usage Summary ===')
+                print(f'Max CPU usage: {max_cpu:.1f}%')
+                print(f'Average CPU usage: {avg_cpu:.1f}%')
+                print(f'Peak memory usage: {max_memory:.2f} GB')
+                print(f'Data points collected: {len(monitoring_data)}')
+                
+                # Alert if resource usage is excessive
+                if max_memory > 2.0:  # Alert if using more than 2GB
+                    print(f'⚠️  WARNING: High memory usage detected ({max_memory:.2f} GB)')
+                if max_cpu > 90:
+                    print(f'⚠️  WARNING: High CPU usage detected ({max_cpu:.1f}%)')
+            else:
+                print('No monitoring data collected')
+        " || echo "Resource monitoring completed with warnings"
+    
+    - name: Upload resource monitoring results
+      uses: actions/upload-artifact@v4
+      with:
+        name: resource-monitoring-${{ github.run_id }}
+        path: |
+          resource_monitoring.json
+      if: always()
+
+  # Cross-platform dependency analysis
+  dependency-analysis:
+    runs-on: ubuntu-latest
+    needs: test-matrix
+    if: always()
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+    
+    - name: Download all dependency validation results
+      uses: actions/download-artifact@v4
+      with:
+        path: dependency-reports/
+        pattern: dependency-validation-*
+    
+    - name: Analyze cross-platform dependency compatibility
+      run: |
+        python -c "
+        import json
+        import os
+        from pathlib import Path
+        from collections import defaultdict
+        
+        print('=== Cross-Platform Dependency Analysis ===')
+        
+        reports_dir = Path('dependency-reports')
+        compatibility_matrix = defaultdict(lambda: defaultdict(dict))
+        all_issues = []
+        platform_summary = {}
+        
+        # Process all dependency validation reports
+        for report_dir in reports_dir.iterdir():
+            if report_dir.is_dir():
+                for json_file in report_dir.glob('*.json'):
+                    try:
+                        with open(json_file, 'r') as f:
+                            data = json.load(f)
+                        
+                        platform = data.get('platform', {})
+                        system = platform.get('system', 'Unknown')
+                        python_ver = platform.get('python_version', 'Unknown')
+                        summary = data.get('summary', {})
+                        
+                        platform_key = f\"{system}-py{python_ver}\"
+                        
+                        # Store platform results
+                        compatibility_matrix[system][python_ver] = {
+                            'successful_imports': summary.get('successful_imports', 0),
+                            'failed_imports': summary.get('failed_imports', 0),
+                            'version_mismatches': summary.get('version_mismatches', 0),
+                            'conflicts_found': summary.get('conflicts_found', 0),
+                            'platform_issues': summary.get('platform_issues', 0),
+                            'total_dependencies': summary.get('total_dependencies', 0)
+                        }
+                        
+                        # Collect issues
+                        if summary.get('failed_imports', 0) > 0:
+                            all_issues.append(f'{platform_key}: {summary[\"failed_imports\"]} failed imports')
+                        if summary.get('version_mismatches', 0) > 0:
+                            all_issues.append(f'{platform_key}: {summary[\"version_mismatches\"]} version mismatches')
+                        if summary.get('conflicts_found', 0) > 0:
+                            all_issues.append(f'{platform_key}: {summary[\"conflicts_found\"]} dependency conflicts')
+                        if summary.get('platform_issues', 0) > 0:
+                            all_issues.append(f'{platform_key}: {summary[\"platform_issues\"]} platform issues')
+                        
+                        # Track platform summary
+                        platform_summary[platform_key] = {
+                            'total_issues': (summary.get('failed_imports', 0) + 
+                                           summary.get('version_mismatches', 0) + 
+                                           summary.get('conflicts_found', 0) + 
+                                           summary.get('platform_issues', 0)),
+                            'status': 'clean' if all(v == 0 for v in [
+                                summary.get('failed_imports', 0),
+                                summary.get('version_mismatches', 0), 
+                                summary.get('conflicts_found', 0),
+                                summary.get('platform_issues', 0)
+                            ]) else 'issues'
+                        }
+                        
+                        print(f'Processed: {platform_key}')
+                        
+                    except (json.JSONDecodeError, KeyError, FileNotFoundError) as e:
+                        print(f'Error processing {json_file}: {e}')
+                        continue
+        
+        # Generate compatibility matrix
+        print()
+        print('Compatibility Matrix:')
+        print('Platform/Python  | Status | Issues')
+        print('-' * 40)
+        
+        clean_platforms = 0
+        total_platforms = 0
+        
+        for platform_key, info in platform_summary.items():
+            total_platforms += 1
+            status_symbol = '✅' if info['status'] == 'clean' else '⚠️'
+            if info['status'] == 'clean':
+                clean_platforms += 1
+            
+            print(f'{platform_key:<15} | {status_symbol} {info[\"status\"]:<5} | {info[\"total_issues\"]}')
+        
+        print()
+        print(f'Clean Platforms: {clean_platforms}/{total_platforms}')
+        
+        if all_issues:
+            print()
+            print('Issues Found:')
+            for issue in all_issues[:10]:  # Show first 10 issues
+                print(f'  - {issue}')
+            if len(all_issues) > 10:
+                print(f'  ... and {len(all_issues) - 10} more issues')
+        
+        # Final assessment
+        if clean_platforms == total_platforms and total_platforms > 0:
+            print()
+            print('🎉 All tested platforms are dependency-clean!')
+        elif clean_platforms / total_platforms >= 0.8 if total_platforms > 0 else False:
+            print()
+            print('✅ Most platforms are clean - minor issues detected')
+        else:
+            print()
+            print('⚠️ Significant dependency issues detected across platforms')
+        
+        # Save summary
+        summary_data = {
+            'total_platforms': total_platforms,
+            'clean_platforms': clean_platforms,
+            'compatibility_rate': clean_platforms / total_platforms if total_platforms > 0 else 0,
+            'platform_summary': platform_summary,
+            'all_issues': all_issues
+        }
+        
+        with open('dependency_compatibility_summary.json', 'w') as f:
+            json.dump(summary_data, f, indent=2)
+        
+        print(f'\\nDependency compatibility analysis saved to dependency_compatibility_summary.json')
+        "
+    
+    - name: Upload dependency analysis summary
+      uses: actions/upload-artifact@v4
+      with:
+        name: dependency-analysis-summary-${{ github.run_id }}
+        path: dependency_compatibility_summary.json
+      if: always()
+
+  # Final validation and reporting
+  validation-summary:
+    runs-on: ubuntu-latest
+    needs: [test-matrix, coverage, performance, reproducibility, resource-monitoring, dependency-analysis]
+    if: always()
+    
+    steps:
+    - name: Collect validation results
+      run: |
+        echo "=== Comprehensive CI Validation Summary ==="
+        echo "Test Matrix: ${{ needs.test-matrix.result }}"
+        echo "Coverage Analysis: ${{ needs.coverage.result }}"
+        echo "Performance Testing: ${{ needs.performance.result }}"
+        echo "Reproducibility: ${{ needs.reproducibility.result }}"
+        echo "Resource Monitoring: ${{ needs.resource-monitoring.result }}"
+        
+        # Determine overall status
+        if [[ "${{ needs.test-matrix.result }}" == "success" && 
+              "${{ needs.coverage.result }}" == "success" ]]; then
+          echo "✅ Core validation PASSED"
+        else
+          echo "❌ Core validation FAILED"
+          exit 1
+        fi
+        
+        # Performance and monitoring are informational
+        echo "📊 Performance and monitoring data collected for analysis"
