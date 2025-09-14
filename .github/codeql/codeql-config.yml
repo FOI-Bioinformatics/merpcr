@@ -6,18 +6,11 @@ disable-default-queries: false
 # Additional query packs for enhanced security analysis
 packs:
   - codeql/python-queries
-  - codeql/security-queries
-  - codeql/experimental-queries
 
 # Custom query suites for bioinformatics security
 queries:
   # Security and vulnerability detection
-  - name: "Security Critical"
-    uses: security-and-quality
-  - name: "Data Validation"
-    uses: security-extended
-  - name: "Performance Issues"
-    uses: code-scanning
+  - uses: security-and-quality
 
 # Path filters for focused analysis
 paths:
@@ -53,83 +46,7 @@ python:
     - "build_ext"
     - "--inplace"
 
-# Enhanced analysis features
+# Enhanced analysis features - keeping only standard options
 feature-flags:
   # Enable advanced dataflow analysis
   - advanced-dataflow
-  # Enable security-focused analysis
-  - security-extended
-  # Enable experimental queries for cutting-edge detection
-  - experimental-queries
-
-# Custom CodeQL library paths for bioinformatics patterns
-library-path:
-  - .github/codeql/queries/
-
-# Analysis configuration for scientific computing security
-analysis:
-  # Memory safety analysis for large genomic datasets
-  memory-safety: true
-  
-  # Input validation analysis for STS and FASTA file processing
-  input-validation: true
-  
-  # Computational resource analysis for performance-critical paths
-  resource-usage: true
-  
-  # Thread safety analysis for parallel processing
-  concurrency: true
-
-# Custom severity levels for bioinformatics context
-severity-levels:
-  # File processing vulnerabilities
-  file-injection: error
-  path-traversal: error
-  
-  # Data integrity issues
-  data-corruption: warning
-  invalid-input: warning
-  
-  # Performance and resource issues
-  memory-leak: warning
-  infinite-loop: error
-  resource-exhaustion: warning
-  
-  # Scientific computing specific
-  numerical-instability: note
-  precision-loss: note
-
-# External data configuration for genomic file analysis
-external-data:
-  # Common bioinformatics file extensions that may contain sensitive data
-  sensitive-extensions:
-    - "*.fa"
-    - "*.fasta"
-    - "*.fastq"
-    - "*.fq" 
-    - "*.sts"
-    - "*.sam"
-    - "*.bam"
-    - "*.vcf"
-    - "*.gff"
-    - "*.gtf"
-  
-  # File size thresholds for analysis (genomic files can be very large)
-  max-file-size: 100MB
-  
-  # Skip binary genomic formats that CodeQL cannot analyze
-  skip-binary-files: true
-
-# Timeout configuration for large codebases
-timeout:
-  # Per-file analysis timeout
-  per-file: 300s
-  # Total analysis timeout
-  total: 1800s
-
-# Resource limits
-resource-limits:
-  # Memory limit for analysis
-  memory: 4GB
-  # CPU usage limit
-  cpu: 2

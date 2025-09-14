@@ -27,13 +27,13 @@ jobs:
     - name: Determine Python versions to test
       id: versions
       run: |
-        # Test all supported versions, with focus on latest stable
+        # Test supported versions (3.11+ only)
         if [[ "${{ github.event_name }}" == "pull_request" ]]; then
           # For PRs, test key versions to save CI time
-          echo 'python-versions=["3.8", "3.11", "3.12"]' >> $GITHUB_OUTPUT
+          echo 'python-versions=["3.11", "3.12"]' >> $GITHUB_OUTPUT
         else
           # For pushes and schedule, test all supported versions
-          echo 'python-versions=["3.8", "3.9", "3.10", "3.11", "3.12"]' >> $GITHUB_OUTPUT
+          echo 'python-versions=["3.11", "3.12", "3.13"]' >> $GITHUB_OUTPUT
         fi
     
     - name: Validate project structure
@@ -57,7 +57,7 @@ jobs:
         include:
           # Test with minimal dependencies
           - os: ubuntu-latest
-            python-version: '3.8'
+            python-version: '3.11'
             test-type: 'minimal'
           # Test with development head versions
           - os: ubuntu-latest
@@ -285,10 +285,10 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    - name: Set up Python 3.11
+    - name: Set up Python 3.12
       uses: actions/setup-python@v5
       with:
-        python-version: '3.11'
+        python-version: '3.12'
 
     - name: Install dependencies
       run: |
@@ -362,10 +362,10 @@ jobs:
         # Need history for performance comparison
         fetch-depth: 0
 
-    - name: Set up Python 3.11
+    - name: Set up Python 3.12
       uses: actions/setup-python@v5
       with:
-        python-version: '3.11'
+        python-version: '3.12'
 
     - name: Install dependencies
       run: |
@@ -520,10 +520,10 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     
-    - name: Set up Python 3.11
+    - name: Set up Python 3.12
       uses: actions/setup-python@v5
       with:
-        python-version: '3.11'
+        python-version: '3.12'
     
     - name: Install dependencies
       run: |
@@ -596,10 +596,10 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     
-    - name: Set up Python 3.11
+    - name: Set up Python 3.12
       uses: actions/setup-python@v5
       with:
-        python-version: '3.11'
+        python-version: '3.12'
     
     - name: Install monitoring dependencies
       run: |
@@ -737,10 +737,10 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     
-    - name: Set up Python 3.11
+    - name: Set up Python 3.12
       uses: actions/setup-python@v5
       with:
-        python-version: '3.11'
+        python-version: '3.12'
     
     - name: Download all dependency validation results
       uses: actions/download-artifact@v4
