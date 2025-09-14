@@ -30,7 +30,11 @@ class TestFileSystemErrorInjection:
 
     def test_sts_file_permission_denied(self):
         """Test STS file loading with permission denied error."""
-        with patch("builtins.open", side_effect=PermissionError("Permission denied")):
+        with patch('os.path.exists', return_value=True), \
+             patch('os.path.isfile', return_value=True), \
+             patch('os.path.getsize', return_value=100), \
+             patch('builtins.open', side_effect=PermissionError("Permission denied")):
+
             engine = MerPCR()
 
             # Should handle permission error gracefully

@@ -60,10 +60,10 @@ jobs:
         # Full history needed for some security tools
         fetch-depth: 0
 
-    - name: Set up Python 3.11
+    - name: Set up Python 3.12
       uses: actions/setup-python@v5
       with:
-        python-version: '3.11'
+        python-version: '3.12'
 
     - name: Install security analysis dependencies
       run: |
@@ -72,7 +72,7 @@ jobs:
         # Static analysis tools
         pip install bandit[toml] safety pip-audit semgrep
         # Additional security tools
-        pip install vulture dlint flake8-bandit flake8-security
+        pip install vulture dlint flake8-bandit
         # SAST tools
         pip install pyre-check
 
@@ -123,7 +123,7 @@ jobs:
         vulture src/ --min-confidence 80 > vulture-report.txt || true
         
         # Security-focused flake8 plugins
-        flake8 src/ --select=DUO,S --format='%(path)s:%(row)d:%(col)d: %(code)s %(text)s' > flake8-security.txt || true
+        flake8 src/ --select=S --format='%(path)s:%(row)d:%(col)d: %(code)s %(text)s' > flake8-security.txt || true
         
         echo "Additional security linting completed"
 
@@ -153,10 +153,10 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     
-    - name: Set up Python 3.11
+    - name: Set up Python 3.12
       uses: actions/setup-python@v5
       with:
-        python-version: '3.11'
+        python-version: '3.12'
     
     - name: Install dynamic analysis tools
       run: |
@@ -348,10 +348,10 @@ jobs:
       with:
         fetch-depth: 0
 
-    - name: Set up Python 3.11
+    - name: Set up Python 3.12
       uses: actions/setup-python@v5
       with:
-        python-version: '3.11'
+        python-version: '3.12'
 
     - name: Install dependency analysis tools
       run: |
@@ -365,7 +365,7 @@ jobs:
     - name: Generate comprehensive dependency reports
       run: |
         # Generate Software Bill of Materials (SBOM)
-        cyclonedx-py -o merpcr-sbom.json
+        cyclonedx-py environment -o merpcr-sbom.json
         
         # Detailed dependency tree
         pipdeptree --json-tree --warn=silence > dependency-tree.json
@@ -473,7 +473,6 @@ jobs:
       with:
         fail-on-severity: moderate
         allow-licenses: GPL-3.0-or-later, MIT, BSD-2-Clause, BSD-3-Clause, Apache-2.0, ISC, PSF-2.0
-        deny-licenses: GPL-2.0, LGPL-2.0, LGPL-2.1
         comment-summary-in-pr: true
         retry-on-snapshot-warnings: true
         warn-only: false
