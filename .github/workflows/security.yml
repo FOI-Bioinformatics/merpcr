@@ -1,4 +1,4 @@
-name: Security
+name: Advanced Security Analysis
 
 on:
   push:
@@ -6,86 +6,735 @@ on:
   pull_request:
     branches: [ main, develop ]
   schedule:
-    # Run weekly security scans on Sunday at 3 AM UTC
+    # Run comprehensive security scans weekly on Sunday at 3 AM UTC
     - cron: '0 3 * * 0'
+  workflow_dispatch:
+    inputs:
+      scan_type:
+        description: 'Type of security scan to run'
+        required: false
+        default: 'comprehensive'
+        type: choice
+        options:
+        - comprehensive
+        - quick
+        - dependencies-only
+
+env:
+  FORCE_COLOR: 1
 
 jobs:
-  security-scan:
+  # Pre-security validation
+  security-validation:
     runs-on: ubuntu-latest
-
+    outputs:
+      scan-level: ${{ steps.determine-scan.outputs.scan-level }}
     steps:
     - uses: actions/checkout@v4
+    
+    - name: Determine security scan level
+      id: determine-scan
+      run: |
+        if [[ "${{ github.event_name }}" == "schedule" || "${{ github.event.inputs.scan_type }}" == "comprehensive" ]]; then
+          echo "scan-level=comprehensive" >> $GITHUB_OUTPUT
+        elif [[ "${{ github.event.inputs.scan_type }}" == "dependencies-only" ]]; then
+          echo "scan-level=dependencies-only" >> $GITHUB_OUTPUT
+        else
+          echo "scan-level=quick" >> $GITHUB_OUTPUT
+        fi
+    
+    - name: Security scan configuration
+      run: |
+        echo "Security scan level: ${{ steps.determine-scan.outputs.scan-level }}"
+        echo "Event: ${{ github.event_name }}"
+
+  # Comprehensive static analysis
+  static-analysis:
+    runs-on: ubuntu-latest
+    needs: security-validation
+    timeout-minutes: 20
+    
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        # Full history needed for some security tools
+        fetch-depth: 0
 
     - name: Set up Python 3.11
       uses: actions/setup-python@v5
       with:
         python-version: '3.11'
 
-    - name: Install dependencies
+    - name: Install security analysis dependencies
       run: |
         python -m pip install --upgrade pip
         pip install -e .
-        pip install bandit safety pip-audit semgrep
+        # Static analysis tools
+        pip install bandit[toml] safety pip-audit semgrep
+        # Additional security tools
+        pip install vulture dlint flake8-bandit flake8-security
+        # SAST tools
+        pip install pyre-check
 
-    - name: Run Bandit security scan
+    - name: Run Bandit security scan with comprehensive rules
       run: |
-        bandit -r src/ -f json -o bandit-report.json
-        bandit -r src/ --severity-level medium
+        # Run with comprehensive rule set
+        bandit -r src/ -f json -o bandit-comprehensive.json -ll
+        bandit -r src/ -ll --severity-level low
+        
+        # Run with specific security test cases
+        bandit -r src/ -f txt -o bandit-detailed.txt --severity-level medium
+        
+        echo "Bandit analysis completed"
 
-    - name: Run Safety dependency check
+    - name: Run Safety dependency vulnerability scan
       run: |
-        safety check --json --output safety-report.json || true
-        safety check
+        # Check for known vulnerabilities in dependencies
+        safety check --json --output safety-report.json --continue-on-error
+        safety check --detailed-output
+        
+        # Generate safety report with full details
+        safety check --full-report > safety-detailed.txt || true
+        
+        echo "Safety analysis completed"
 
-    - name: Run pip-audit
+    - name: Run pip-audit for additional dependency checking
       run: |
-        pip-audit --desc --output=json --output-file=pip-audit-report.json || true
+        # Comprehensive audit of all dependencies
+        pip-audit --desc --format=json --output=pip-audit-comprehensive.json --require-hashes --continue-on-error
+        pip-audit --desc --format=text --output=pip-audit-detailed.txt --continue-on-error
         pip-audit --desc
+        
+        echo "pip-audit analysis completed"
+
+    - name: Run Semgrep SAST analysis
+      if: needs.security-validation.outputs.scan-level == 'comprehensive'
+      run: |
+        # Run comprehensive Semgrep rules
+        semgrep --config=auto src/ --json --output=semgrep-results.json --timeout=300 --quiet
+        semgrep --config=auto src/ --text
+        
+        echo "Semgrep analysis completed"
+
+    - name: Run additional security linters
+      if: needs.security-validation.outputs.scan-level == 'comprehensive'
+      run: |
+        # Dead code detection (potential security risk)
+        vulture src/ --min-confidence 80 > vulture-report.txt || true
+        
+        # Security-focused flake8 plugins
+        flake8 src/ --select=DUO,S --format='%(path)s:%(row)d:%(col)d: %(code)s %(text)s' > flake8-security.txt || true
+        
+        echo "Additional security linting completed"
+
+    - name: Upload comprehensive security reports
+      uses: actions/upload-artifact@v4
+      with:
+        name: static-analysis-reports-${{ github.run_id }}
+        path: |
+          bandit-*.json
+          bandit-*.txt
+          safety-*.json
+          safety-*.txt
+          pip-audit-*.json
+          pip-audit-*.txt
+          semgrep-*.json
+          vulture-*.txt
+          flake8-*.txt
+      if: always()
+
+  # Dynamic security testing
+  dynamic-analysis:
+    runs-on: ubuntu-latest
+    needs: security-validation
+    if: needs.security-validation.outputs.scan-level == 'comprehensive'
+    timeout-minutes: 30
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+    
+    - name: Install dynamic analysis tools
+      run: |
+        python -m pip install --upgrade pip
+        pip install -e .
+        pip install pytest pytest-cov psutil
+        # Install runtime security monitoring
+        pip install py-spy memory-profiler
+
+    - name: Generate comprehensive test data for security testing
+      run: |
+        python -c "
+        import os
+        from pathlib import Path
+        
+        # Create test data that might trigger security issues
+        test_data_dir = Path('tests/data/security')
+        test_data_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Test files with potential security issues
+        security_sts = test_data_dir / 'security_test.sts'
+        with open(security_sts, 'w') as f:
+            # Normal data
+            f.write('NORMAL_STS\\tATCGATCGATCGATC\\tGCTAGCTAGCTAGCT\\t200\\tNormal test\\n')
+            
+            # Edge cases that might cause issues
+            f.write('LONG_ID_' + 'X' * 1000 + '\\tATCGATCGATCGATC\\tGCTAGCTAGCTAGCT\\t200\\tLong ID test\\n')
+            f.write('SPECIAL_CHARS\\tATCG<>ATCG\\tGCTA&*GCTA\\t200\\tSpecial characters\\n')
+            f.write('UNICODE_TEST\\tATCGÀÑÇÏÇ\\tGCTAÉÑÇÒÐ\\t200\\tUnicode test\\n')
+            
+            # Very long sequences
+            long_seq = 'ATCG' * 500  # 2000 bp sequence
+            f.write(f'LONG_SEQ\\t{long_seq}\\t{long_seq}\\t5000\\tVery long sequences\\n')
+        
+        # Large file to test memory handling
+        large_sts = test_data_dir / 'large_security.sts'
+        with open(large_sts, 'w') as f:
+            for i in range(10000):
+                f.write(f'SEC_STS_{i:05d}\\tATCGATCGATCGATC{i%10}\\tGCTAGCTAGCTAGCT{i%10}\\t{200+i%100}\\tSecurity test {i}\\n')
+        
+        print('Security test datasets created')
+        print(f'Large STS file size: {large_sts.stat().st_size / (1024*1024):.1f} MB')
+        "
+
+    - name: Run security-focused integration tests
+      timeout-minutes: 15
+      run: |
+        # Test with potentially malicious input
+        python -c "
+        import os
+        from pathlib import Path
+        from merpcr import MerPCR
+        
+        print('Running security-focused tests...')
+        
+        # Test 1: Large file handling
+        engine = MerPCR(wordsize=11, margin=50)
+        large_file = 'tests/data/security/large_security.sts'
+        
+        if os.path.exists(large_file):
+            print('Testing large file security...')
+            start_time = __import__('time').time()
+            success = engine.load_sts_file(large_file)
+            load_time = __import__('time').time() - start_time
+            
+            print(f'Large file load: {success} (took {load_time:.2f}s)')
+            print(f'Loaded {len(engine.sts_records)} STS records')
+            
+            # Check for reasonable performance (shouldn't take too long)
+            if load_time > 30:  # Alert if takes more than 30 seconds
+                print('⚠️  WARNING: Large file loading took excessive time')
+        
+        # Test 2: Edge case handling
+        engine2 = MerPCR(wordsize=8, margin=100)
+        edge_file = 'tests/data/security/security_test.sts'
+        
+        if os.path.exists(edge_file):
+            print('Testing edge case security...')
+            try:
+                success = engine2.load_sts_file(edge_file)
+                print(f'Edge case file load: {success}')
+                print(f'Loaded {len(engine2.sts_records)} STS records (some may be filtered)')
+            except Exception as e:
+                print(f'Edge case handling exception (may be expected): {e}')
+        
+        print('Security integration tests completed')
+        "
+
+    - name: Monitor resource usage during security tests
+      run: |
+        python -c "
+        import psutil
+        import time
+        import json
+        from pathlib import Path
+        
+        # Monitor system resources during security testing
+        monitoring_start = time.time()
+        initial_memory = psutil.virtual_memory().used / (1024**3)
+        
+        print(f'Initial memory usage: {initial_memory:.2f} GB')
+        
+        # Run a resource-intensive operation
+        from merpcr import MerPCR
+        import os
+        
+        if os.path.exists('tests/data/security/large_security.sts'):
+            engine = MerPCR(wordsize=11, margin=50, threads=1)  # Single thread for consistent monitoring
+            
+            # Monitor during loading
+            start_load = time.time()
+            success = engine.load_sts_file('tests/data/security/large_security.sts')
+            end_load = time.time()
+            
+            peak_memory = psutil.virtual_memory().used / (1024**3)
+            memory_increase = peak_memory - initial_memory
+            
+            security_metrics = {
+                'load_time_seconds': end_load - start_load,
+                'initial_memory_gb': initial_memory,
+                'peak_memory_gb': peak_memory,
+                'memory_increase_gb': memory_increase,
+                'records_loaded': len(engine.sts_records),
+                'load_success': success
+            }
+            
+            # Save security metrics
+            with open('security_metrics.json', 'w') as f:
+                json.dump(security_metrics, f, indent=2)
+            
+            print('Security resource monitoring:')
+            print(f'  Load time: {security_metrics[\"load_time_seconds\"]:.2f}s')
+            print(f'  Memory increase: {security_metrics[\"memory_increase_gb\"]:.2f} GB')
+            print(f'  Records loaded: {security_metrics[\"records_loaded\"]}')
+            
+            # Security alerts
+            if security_metrics['memory_increase_gb'] > 1.0:
+                print('⚠️  WARNING: High memory increase during loading')
+            if security_metrics['load_time_seconds'] > 60:
+                print('⚠️  WARNING: Very slow loading time detected')
+                
+        else:
+            print('Security test files not found, skipping resource monitoring')
+        "
+
+    - name: Upload dynamic analysis results
+      uses: actions/upload-artifact@v4
+      with:
+        name: dynamic-analysis-results-${{ github.run_id }}
+        path: |
+          security_metrics.json
+      if: always()
+
+  # GitHub Advanced Security (CodeQL)
+  codeql-analysis:
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    timeout-minutes: 25
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
 
     - name: Initialize CodeQL
       uses: github/codeql-action/init@v3
       with:
         languages: python
+        config-file: ./.github/codeql/codeql-config.yml
+        queries: +security-and-quality
 
     - name: Autobuild
       uses: github/codeql-action/autobuild@v3
 
     - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@v3
-
-    - name: Upload security scan results
-      uses: actions/upload-artifact@v4
       with:
-        name: security-reports
-        path: |
-          bandit-report.json
-          safety-report.json
-          pip-audit-report.json
-      if: always()
+        category: "/language:python"
 
-  dependency-review:
+  # Comprehensive dependency analysis
+  dependency-analysis:
     runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request'
-
-    steps:
-    - name: Dependency Review
-      uses: actions/dependency-review-action@v4
-      with:
-        fail-on-severity: moderate
-        allow-licenses: GPL-3.0, MIT, BSD-2-Clause, BSD-3-Clause, Apache-2.0, ISC
-
-  secrets-scan:
-    runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     steps:
     - uses: actions/checkout@v4
       with:
         fetch-depth: 0
 
-    - name: TruffleHog OSS
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: Install dependency analysis tools
+      run: |
+        python -m pip install --upgrade pip
+        pip install -e .
+        # Dependency analysis tools
+        pip install pip-audit cyclonedx-bom pipdeptree safety
+        # License checking
+        pip install pip-licenses
+
+    - name: Generate comprehensive dependency reports
+      run: |
+        # Generate Software Bill of Materials (SBOM)
+        cyclonedx-py -o merpcr-sbom.json
+        
+        # Detailed dependency tree
+        pipdeptree --json-tree --warn=silence > dependency-tree.json
+        pipdeptree --graph-output svg > dependency-graph.svg
+        
+        # License analysis
+        pip-licenses --format=json --output-file=licenses.json
+        pip-licenses --format=markdown --output-file=licenses.md
+        
+        # Comprehensive security audit
+        pip-audit --format=json --output=dependency-audit.json --require-hashes --continue-on-error
+        
+        echo "Dependency analysis completed"
+
+    - name: Analyze dependency security risks
+      run: |
+        python -c "
+        import json
+        import sys
+        from pathlib import Path
+        
+        print('=== Dependency Security Analysis ===')
+        
+        # Load dependency tree
+        if Path('dependency-tree.json').exists():
+            with open('dependency-tree.json') as f:
+                deps = json.load(f)
+            
+            print(f'Total direct dependencies: {len(deps)}')
+            
+            # Count total dependencies (including transitive)
+            def count_deps(dep_list, seen=None):
+                if seen is None:
+                    seen = set()
+                count = 0
+                for dep in dep_list:
+                    if dep['package_name'] not in seen:
+                        seen.add(dep['package_name'])
+                        count += 1
+                        count += count_deps(dep.get('dependencies', []), seen)
+                return count
+            
+            total_deps = count_deps(deps)
+            print(f'Total dependencies (including transitive): {total_deps}')
+        
+        # Load license information
+        if Path('licenses.json').exists():
+            with open('licenses.json') as f:
+                licenses = json.load(f)
+            
+            license_summary = {}
+            for pkg in licenses:
+                license_name = pkg.get('License', 'Unknown')
+                license_summary[license_name] = license_summary.get(license_name, 0) + 1
+            
+            print('License distribution:')
+            for license_name, count in sorted(license_summary.items()):
+                print(f'  {license_name}: {count} packages')
+        
+        # Load audit results
+        if Path('dependency-audit.json').exists():
+            with open('dependency-audit.json') as f:
+                audit = json.load(f)
+            
+            vulnerabilities = audit.get('vulnerabilities', [])
+            print(f'Security vulnerabilities found: {len(vulnerabilities)}')
+            
+            if vulnerabilities:
+                print('Vulnerability summary:')
+                for vuln in vulnerabilities[:5]:  # Show first 5
+                    pkg = vuln.get('package', 'Unknown')
+                    id_info = vuln.get('id', 'Unknown')
+                    print(f'  {pkg}: {id_info}')
+                
+                if len(vulnerabilities) > 5:
+                    print(f'  ... and {len(vulnerabilities) - 5} more')
+        
+        print('Dependency security analysis completed')
+        "
+
+    - name: Upload dependency analysis results
+      uses: actions/upload-artifact@v4
+      with:
+        name: dependency-analysis-${{ github.run_id }}
+        path: |
+          merpcr-sbom.json
+          dependency-tree.json
+          dependency-graph.svg
+          licenses.json
+          licenses.md
+          dependency-audit.json
+      if: always()
+
+  # Dependency review for pull requests
+  dependency-review:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+    - name: Dependency Review
+      uses: actions/dependency-review-action@v4
+      with:
+        fail-on-severity: moderate
+        allow-licenses: GPL-3.0-or-later, MIT, BSD-2-Clause, BSD-3-Clause, Apache-2.0, ISC, PSF-2.0
+        deny-licenses: GPL-2.0, LGPL-2.0, LGPL-2.1
+        comment-summary-in-pr: true
+        retry-on-snapshot-warnings: true
+        warn-only: false
+
+  # Secrets and credential scanning
+  secrets-analysis:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: TruffleHog Secret Scanning
       uses: trufflesecurity/trufflehog@main
       with:
         path: ./
         base: main
         head: HEAD
-        extra_args: --debug --only-verified
+        extra_args: --debug --only-verified --json --archive-max-size=50MB > trufflehog-results.json
+
+    - name: GitLeaks Secret Detection
+      uses: gitleaks/gitleaks-action@v2
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE}} # Only required for Organizations and Enterprise accounts
+
+    - name: Additional credential pattern scanning
+      run: |
+        # Custom patterns for bioinformatics/research credentials
+        echo "Scanning for research-specific credential patterns..."
+        
+        # Look for potential API keys, database connections, etc.
+        grep -r -E "(api[_-]?key|secret|password|token|credential)" --include="*.py" --include="*.md" --include="*.txt" src/ docs/ || true
+        
+        # Check for hardcoded file paths that might contain sensitive info
+        grep -r -E "(home|users)/[a-zA-Z0-9_-]+/(.*key|.*secret|.*password)" --include="*.py" src/ || true
+        
+        echo "Custom credential scanning completed"
+
+    - name: Upload secrets analysis results
+      uses: actions/upload-artifact@v4
+      with:
+        name: secrets-analysis-${{ github.run_id }}
+        path: |
+          trufflehog-results.json
+          results.sarif
+      if: always()
+
+  # Container security scanning (if Dockerfile exists)
+  container-security:
+    runs-on: ubuntu-latest
+    if: needs.security-validation.outputs.scan-level == 'comprehensive'
+    needs: security-validation
+    timeout-minutes: 20
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Check for container files
+      id: container-check
+      run: |
+        if [ -f Dockerfile ] || [ -f docker-compose.yml ] || [ -f .dockerignore ]; then
+          echo "container-files=true" >> $GITHUB_OUTPUT
+        else
+          echo "container-files=false" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Create test Dockerfile for security scanning
+      if: steps.container-check.outputs.container-files == 'false'
+      run: |
+        # Create a basic Dockerfile for testing
+        cat > Dockerfile << EOF
+        FROM python:3.11-slim
+
+        # Security: Create non-root user
+        RUN groupadd -r merpcr && useradd -r -g merpcr merpcr
+
+        # Install system dependencies
+        RUN apt-get update && apt-get install -y \\
+            && apt-get clean \\
+            && rm -rf /var/lib/apt/lists/*
+
+        # Set working directory
+        WORKDIR /app
+
+        # Copy application
+        COPY . .
+
+        # Install Python dependencies
+        RUN pip install --no-cache-dir -e .
+
+        # Switch to non-root user
+        USER merpcr
+
+        # Run application
+        CMD ["python", "-m", "merpcr", "--help"]
+        EOF
+
+    - name: Build Docker image for security testing
+      if: steps.container-check.outputs.container-files == 'true' || steps.container-check.outputs.container-files == 'false'
+      run: |
+        docker build -t merpcr:security-test .
+
+    - name: Run Trivy container security scan
+      if: steps.container-check.outputs.container-files == 'true' || steps.container-check.outputs.container-files == 'false'
+      uses: aquasecurity/trivy-action@master
+      with:
+        image-ref: 'merpcr:security-test'
+        format: 'json'
+        output: 'trivy-results.json'
+
+    - name: Run Snyk container security scan
+      if: (steps.container-check.outputs.container-files == 'true' || steps.container-check.outputs.container-files == 'false') && env.SNYK_TOKEN != ''
+      env:
+        SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+      run: |
+        # Install Snyk CLI
+        npm install -g snyk
+        
+        # Test container for vulnerabilities
+        snyk container test merpcr:security-test --json > snyk-container-results.json || true
+        
+        echo "Snyk container scanning completed"
+
+    - name: Upload container security results
+      uses: actions/upload-artifact@v4
+      with:
+        name: container-security-${{ github.run_id }}
+        path: |
+          trivy-results.json
+          snyk-container-results.json
+          Dockerfile
+      if: always()
+
+  # Security reporting and summary
+  security-summary:
+    runs-on: ubuntu-latest
+    needs: [static-analysis, dynamic-analysis, codeql-analysis, dependency-analysis, secrets-analysis, container-security]
+    if: always()
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Download all security artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: security-reports/
+
+    - name: Generate comprehensive security summary
+      run: |
+        python -c "
+        import json
+        import os
+        from pathlib import Path
+        
+        print('=== Comprehensive Security Analysis Summary ===')
+        print()
+        
+        reports_dir = Path('security-reports')
+        
+        # Summary counters
+        total_issues = 0
+        high_severity = 0
+        medium_severity = 0
+        low_severity = 0
+        
+        # Process static analysis results
+        for report_dir in reports_dir.iterdir():
+            if report_dir.is_dir():
+                print(f'Processing {report_dir.name}...')
+                
+                # Look for JSON reports
+                for json_file in report_dir.glob('*.json'):
+                    try:
+                        with open(json_file) as f:
+                            data = json.load(f)
+                        
+                        # Process different report types
+                        if 'bandit' in json_file.name:
+                            issues = data.get('results', [])
+                            total_issues += len(issues)
+                            for issue in issues:
+                                severity = issue.get('issue_severity', '').lower()
+                                if severity == 'high':
+                                    high_severity += 1
+                                elif severity == 'medium':
+                                    medium_severity += 1
+                                else:
+                                    low_severity += 1
+                        
+                        elif 'safety' in json_file.name:
+                            vulnerabilities = data.get('report', {}).get('vulnerabilities', [])
+                            total_issues += len(vulnerabilities)
+                            high_severity += len(vulnerabilities)  # Assume all safety issues are high
+                        
+                        elif 'pip-audit' in json_file.name:
+                            vulnerabilities = data.get('vulnerabilities', [])
+                            total_issues += len(vulnerabilities)
+                            medium_severity += len(vulnerabilities)  # Assume medium severity
+                        
+                        elif 'dependency-audit' in json_file.name:
+                            vulnerabilities = data.get('vulnerabilities', [])
+                            total_issues += len(vulnerabilities)
+                    
+                    except (json.JSONDecodeError, KeyError, FileNotFoundError):
+                        continue
+        
+        print(f'Total security issues found: {total_issues}')
+        print(f'  High severity: {high_severity}')
+        print(f'  Medium severity: {medium_severity}')
+        print(f'  Low severity: {low_severity}')
+        print()
+        
+        # Security assessment
+        if high_severity > 0:
+            print('🔴 SECURITY ALERT: High severity issues found!')
+            print('   Immediate attention required')
+        elif medium_severity > 0:
+            print('🟡 SECURITY WARNING: Medium severity issues found')
+            print('   Review and remediation recommended')
+        elif low_severity > 0:
+            print('🟢 SECURITY INFO: Only low severity issues found')
+            print('   Consider addressing when convenient')
+        else:
+            print('✅ SECURITY CLEAN: No security issues detected')
+        
+        print()
+        print('Detailed reports available in CI artifacts.')
+        "
+
+    - name: Security policy compliance check
+      run: |
+        echo "=== Security Policy Compliance ==="
+        
+        # Check for security best practices in the codebase
+        echo "Checking security policy compliance..."
+        
+        # 1. Check for proper error handling
+        if grep -r "except:" src/ --include="*.py"; then
+          echo "⚠️  Found bare except clauses - consider specific exception handling"
+        fi
+        
+        # 2. Check for subprocess usage without shell=False
+        if grep -r "subprocess" src/ --include="*.py" | grep -v "shell=False"; then
+          echo "⚠️  Found subprocess usage - verify shell=False is used"
+        fi
+        
+        # 3. Check for eval/exec usage
+        if grep -r -E "(^|[^a-zA-Z])eval\(" src/ --include="*.py"; then
+          echo "🔴 CRITICAL: Found eval() usage - potential code injection risk"
+        fi
+        
+        if grep -r -E "(^|[^a-zA-Z])exec\(" src/ --include="*.py"; then
+          echo "🔴 CRITICAL: Found exec() usage - potential code injection risk"
+        fi
+        
+        # 4. Check for file operations without proper validation
+        if grep -r "open(" src/ --include="*.py" | grep -v "with open"; then
+          echo "⚠️  Found file operations without context managers"
+        fi
+        
+        echo "Security policy compliance check completed"

@@ -172,3 +172,124 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+
+# === macOS Development ===
+
+# macOS system files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# macOS Finder attributes
+.fseventsd/
+.VolumeIcon.icns
+.AppleDouble
+.LSOverride
+
+# macOS temporary files
+*~
+.#*
+
+# Xcode (if using Xcode for editing)
+*.xcodeproj/
+*.xcworkspace/
+build/
+DerivedData/
+*.pbxuser
+*.mode1v3
+*.mode2v3
+*.perspectivev3
+
+# === IDE & Editor Files ===
+
+# VS Code
+.vscode/
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.code-workspace
+
+# JetBrains IDEs (PyCharm, IntelliJ, etc.)
+.idea/
+*.iml
+*.iws
+
+# Vim
+*.swp
+*.swo
+*~
+.netrwhist
+
+# Emacs
+*~
+\#*\#
+/.emacs.desktop
+/.emacs.desktop.lock
+*.elc
+auto-save-list
+tramp
+.\#*
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# Atom
+.atom/
+
+# === Development Tools ===
+
+# Pre-commit
+.pre-commit-config.yaml.bak
+
+# Profiling
+*.prof
+*.lprof
+
+# Backup files
+*.bak
+*.backup
+*.orig
+
+# Temporary files
+*.tmp
+*.temp
+.temporary/
+
+# === Project Specific ===
+
+# Test artifacts
+test_output/
+test_results/
+*.test
+*.log
+
+# Coverage files (additional)
+.coverage.html
+coverage/
+htmlcov/
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+
+# Local configuration
+local_config.py
+config_local.py
+.env.local
+.env.development
+
+# Documentation build
+docs/_build/
+docs/build/
+site/
+
+# Performance profiling
+*.perf
+performance_results/

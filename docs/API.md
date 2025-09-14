@@ -1,12 +1,12 @@
-# API Reference
+# API Technical Specification
 
-This document provides detailed API documentation for the merPCR package.
+This document provides comprehensive technical documentation for the merPCR software package interface.
 
-## Core Classes
+## Primary Classes
 
 ### MerPCR
 
-The main search engine class that handles STS marker searching in genomic sequences.
+Principal computational engine class implementing STS marker detection algorithms for genomic sequence analysis.
 
 #### Constructor
 
@@ -23,73 +23,73 @@ MerPCR(
 )
 ```
 
-**Parameters:**
-- `wordsize` (int): Size of the hash word for initial matching (3-16). Default: 11
-- `margin` (int): Maximum allowed distance deviation from expected PCR size (0-10000). Default: 50
-- `mismatches` (int): Number of mismatches allowed in primer matching (0-10). Default: 0
-- `three_prime_match` (int): Number of bases at 3' end that must match exactly. Default: 1
-- `threads` (int): Number of threads to use for processing. Default: 1
-- `quiet` (int): Verbosity level (0=verbose, 1=quiet). Default: 1
-- `default_pcr_size` (int): Default PCR product size when not specified (50-10000). Default: 240
-- `iupac_mode` (int): Whether to honor IUPAC ambiguity codes (0=no, 1=yes). Default: 0
+**Parameter Specifications:**
+- `wordsize` (int): Hash word length for initial sequence matching (valid range: 3-16). Default: 11
+- `margin` (int): Maximum permitted deviation from expected PCR amplicon size (valid range: 0-10000). Default: 50
+- `mismatches` (int): Permitted mismatch count in primer-template alignment (valid range: 0-10). Default: 0
+- `three_prime_match` (int): Required exact match length at primer 3' terminus. Default: 1
+- `threads` (int): Concurrent processing thread count for computational parallelization. Default: 1
+- `quiet` (int): Logging verbosity control (0=detailed output, 1=minimal output). Default: 1
+- `default_pcr_size` (int): Default amplicon size for undefined PCR products (valid range: 50-10000). Default: 240
+- `iupac_mode` (int): IUPAC ambiguity nucleotide code processing (0=disabled, 1=enabled). Default: 0
 
-**Raises:**
-- `ValueError`: If any parameter is outside valid range
+**Exception Handling:**
+- `ValueError`: Raised when input parameters exceed defined validation ranges
 
 #### Methods
 
 ##### load_sts_file(filename: str) -> bool
 
-Load STS markers from a tab-delimited file.
+Imports STS marker definitions from tab-delimited input files.
 
-**Parameters:**
-- `filename` (str): Path to the STS file
+**Input Parameters:**
+- `filename` (str): Filesystem path to STS marker definition file
 
-**Returns:**
-- `bool`: True if loading succeeded, False otherwise
+**Return Values:**
+- `bool`: Success indicator (True=successful import, False=import failure)
 
-**File Format:**
-Each line should contain: `ID\tPrimer1\tPrimer2\tPCR_Size\t[Alias]`
+**File Format Specification:**
+Tab-delimited format: `Identifier\tForward_Primer\tReverse_Primer\tAmplicon_Size\t[Optional_Annotation]`
 
 ##### load_fasta_file(filename: str) -> List[FASTARecord]
 
-Load sequences from a FASTA file.
+Imports genomic sequences from FASTA-formatted input files.
 
-**Parameters:**
-- `filename` (str): Path to the FASTA file
+**Input Parameters:**
+- `filename` (str): Filesystem path to FASTA sequence file
 
-**Returns:**
-- `List[FASTARecord]`: List of loaded FASTA records
+**Return Values:**
+- `List[FASTARecord]`: Collection of parsed sequence records with associated metadata
 
 ##### search(fasta_records: List[FASTARecord], output_file: Optional[str] = None) -> int
 
-Search for STS matches in the given sequences.
+Executes STS marker detection algorithms against target genomic sequences.
 
-**Parameters:**
-- `fasta_records` (List[FASTARecord]): Sequences to search
-- `output_file` (Optional[str]): Output file path (None for stdout)
+**Input Parameters:**
+- `fasta_records` (List[FASTARecord]): Target genomic sequences for analysis
+- `output_file` (Optional[str]): Output destination specification (None directs to stdout)
 
-**Returns:**
-- `int`: Total number of hits found
+**Return Values:**
+- `int`: Total count of detected STS marker matches
 
-## Data Models
+## Data Structure Specifications
 
 ### STSRecord
 
-Represents a Sequence-Tagged Site marker.
+Data structure representing Sequence-Tagged Site marker definitions.
 
 ```python
 @dataclass
 class STSRecord:
-    id: str                    # Unique identifier
-    primer1: str              # First primer sequence
-    primer2: str              # Second primer sequence
-    pcr_size: int            # Expected PCR product size
-    alias: str = ""          # Optional alias/description
-    offset: int = 0          # Offset in sequence
-    hash_offset: int = 0     # Hash computation offset
-    direct: str = '+'        # Strand direction ('+' or '-')
-    ambig_primer: int = 0    # IUPAC ambiguity flag
+    id: str                    # Unique STS identifier
+    primer1: str              # Forward primer sequence (5' to 3')
+    primer2: str              # Reverse primer sequence (5' to 3')
+    pcr_size: int            # Predicted PCR amplicon size
+    alias: str = ""          # Optional descriptive annotation
+    offset: int = 0          # Positional offset within input file
+    hash_offset: int = 0     # Hash computation positional offset
+    direct: str = '+'        # Amplification strand orientation ('+' forward, '-' reverse)
+    ambig_primer: int = 0    # IUPAC ambiguity presence indicator
 ```
 
 ### FASTARecord

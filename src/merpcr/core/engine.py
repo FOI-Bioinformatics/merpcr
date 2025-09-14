@@ -53,6 +53,7 @@ class MerPCR:
         iupac_mode: int = DEFAULT_IUPAC_MODE,
         default_pcr_size: int = DEFAULT_PCR_SIZE,
         threads: int = DEFAULT_THREADS,
+        max_sts_line_length: int = 1022,
     ):
         """Initialize the MerPCR class with search parameters."""
         self.wordsize = wordsize
@@ -62,6 +63,7 @@ class MerPCR:
         self.iupac_mode = iupac_mode
         self.default_pcr_size = default_pcr_size
         self.threads = threads
+        self.max_sts_line_length = max_sts_line_length
 
         # Storage for loaded data
         self.sts_records = []
@@ -363,7 +365,10 @@ class MerPCR:
     def search(self, fasta_records: List[FASTARecord], output_file: str = None) -> int:
         """Search for STS markers in the provided FASTA sequences."""
         total_hits = 0
-        output = open(output_file, "w") if output_file else sys.stdout
+        if output_file and output_file.lower() != "stdout":
+            output = open(output_file, "w")
+        else:
+            output = sys.stdout
 
         for record in fasta_records:
             seq_label = record.label
@@ -434,11 +439,11 @@ class MerPCR:
                 pos1 = hit.pos1 + 1  # Convert to 1-based
                 pos2 = hit.pos2 + 1  # Convert to 1-based
 
-                output_line = f"{seq_label}\t{pos1}..{pos2}\t{sts.id}\t({sts.direct})"
+                output_line = f"{seq_label}\t{pos1}..{pos2}\t{sts.id}\t{sts.alias}\t({sts.direct})"
                 print(output_line, file=output)
                 total_hits += 1
 
-        if output_file:
+        if output_file and output_file.lower() != "stdout":
             output.close()
 
         logger.info(f"Total hits found: {total_hits}")
