@@ -35,7 +35,7 @@ Extensive validation against the original me-PCR demonstrates complete functiona
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/merpcr.git
+git clone https://github.com/FOI-Bioinformatics/merpcr.git
 cd merpcr
 
 # Install in development mode
