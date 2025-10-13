@@ -262,9 +262,4 @@ merPCR builds upon the pioneering work of:
 
 2. Altschul, S.F., Gish, W., Miller, W., Myers, E.W., and Lipman, D.J. (1990) "Basic local alignment search tool." *Journal of Molecular Biology* **215**: 403-410. doi:10.1016/S0022-2836(05)80360-2
 
----
 
-<div align="center">
-  <p><strong>merPCR</strong> - Production-ready electronic PCR in Python</p>
-  <p>Maintained with ❤️ by the merPCR team</p>
-</div>
