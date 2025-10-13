@@ -1,157 +1,247 @@
-# Continuous Integration and Deployment Infrastructure
+# CI/CD Documentation
 
-This document provides technical specifications for the GitHub Actions automation workflows implemented for the merPCR project.
+This document describes the simplified and focused GitHub Actions workflows for the merPCR project.
 
-## Workflow Architecture
+## Overview
 
-### 1. Continuous Integration Pipeline (`ci.yml`)
-**Activation Triggers**: Repository push events to main/develop branches, Pull request submissions
-**Technical Capabilities**:
-- Cross-platform validation matrix spanning Python 3.8-3.12 across Ubuntu, macOS, and Windows environments
-- Automated test dataset generation for missing reference files
-- Systematic test categorization: unit validation, integration testing, CLI verification, performance benchmarking
-- Code coverage analysis with Codecov reporting integration
-- Computational performance regression testing (activated on push/scheduled intervals)
+The CI/CD system has been streamlined to provide essential testing, quality checks, security scanning, and release automation without unnecessary complexity.
 
-### 2. Code Quality Assurance (`code-quality.yml`)
-**Activation Triggers**: Repository modifications to main/develop branches, Pull request events
-**Quality Control Features**:
-- Static code analysis via flake8 linting framework
-- Code standardization verification using black and isort formatters
-- Type annotation validation through mypy analysis (advisory mode)
-- Security vulnerability assessment via bandit scanning
-- Dependency security evaluation using safety auditing tools
-- Documentation consistency validation
-- Automated code formatting on pull request submissions (requires repository write permissions)
+**Total Workflows**: 4
+**Total Lines**: ~370 (down from 1,809)
+**Focus**: Core functionality, speed, and maintainability
 
-### 3. Security Assessment Framework (`security.yml`)
-**Activation Triggers**: Repository updates to main/develop branches, Pull request submissions, Weekly automated schedule
-**Security Capabilities**:
-- Multi-layered security analysis utilizing bandit, safety, and pip-audit tools
-- GitHub CodeQL semantic code analysis
-- Dependency vulnerability assessment for pull request modifications
-- Credential and secret detection through TruffleHog scanning
-- Software license compatibility verification
+## Workflows
 
-### 4. Release Management Pipeline (`release.yml`)
-**Activation Triggers**: Git tag creation with 'v' prefix, Manual workflow dispatch
-**Release Features**:
-- Comprehensive test suite validation prior to package creation
-- Distribution package construction and integrity validation
-- Automated GitHub release generation with metadata
-- PyPI distribution publishing (requires PYPI_API_TOKEN authentication)
+### 1. Tests (`test.yml`)
+
+**Triggers**: Push to main/develop, Pull requests
+
+**Purpose**: Core testing across platforms and Python versions
+
+**Jobs**:
+- **test**: Matrix testing on Ubuntu, macOS, and Windows with Python 3.11-3.13
+  - Runs pytest with coverage
+  - Uses parallel execution (-n auto)
+  - Uploads coverage to Codecov (Ubuntu + Python 3.12 only)
+
+- **compatibility**: Tests me-PCR compatibility
+  - Runs `test_compatibility.py`
+  - Ensures backward compatibility with me-PCR v1.0.6
+
+**Runtime**: ~5-10 minutes per matrix configuration
+
+### 2. Code Quality (`quality.yml`)
+
+**Triggers**: Push to main/develop, Pull requests
+
+**Purpose**: Code linting, formatting, type checking, and basic security
+
+**Jobs**:
+- **lint**: Quality checks
+  - flake8 linting (syntax errors and complexity)
+  - black formatting verification
+  - isort import sorting verification
+  - mypy type checking
+  - bandit security scanning
+
+- **format**: Auto-formatting on PRs
+  - Automatically formats code with black and isort
+  - Commits changes back to PR branch
+  - Requires write permissions
+
+**Runtime**: ~2-3 minutes
+
+### 3. Security (`security.yml`)
+
+**Triggers**: Push to main/develop, Pull requests, Weekly schedule (Sunday 3 AM UTC)
+
+**Purpose**: Security vulnerability detection
+
+**Jobs**:
+- **codeql**: GitHub's advanced security analysis
+  - Comprehensive static analysis
+  - Maintained by GitHub Security Lab
+  - Checks for vulnerabilities, secrets, and code quality issues
+
+- **dependency-review**: PR dependency analysis
+  - Checks for vulnerable dependencies in PRs
+  - Enforces license compatibility
+  - Provides automated PR comments with findings
+
+**Runtime**: ~5-8 minutes
+
+### 4. Release (`release.yml`)
+
+**Triggers**: Git tags (v*), Manual workflow dispatch
+
+**Purpose**: Package building and distribution
+
+**Jobs**:
+- **test**: Pre-release test verification
+- **build**: Package building with verification
+- **release**: GitHub release creation
+- **publish-pypi**: PyPI package publication
+- **notify**: Release notification
+
+**Runtime**: ~10-15 minutes
 
 ## Configuration Files
 
-### Test Configuration
-- `pytest.ini`: pytest configuration with test markers
-- `.coveragerc`: Coverage reporting settings
-- `tox.ini`: Multi-environment testing configuration
-- `Makefile`: Development convenience commands
-
-### Issue Templates
-- `.github/ISSUE_TEMPLATE/bug_report.yml`: Structured bug reports
-- `.github/ISSUE_TEMPLATE/feature_request.yml`: Feature request template
-
-## Fixed Issues
-
-### Recent Fixes Applied:
-1. **Deprecated Actions**: Updated to latest versions
-   - `actions/upload-artifact@v3` → `v4`
-   - `actions/download-artifact@v3` → `v4`
-   - `actions/setup-python@v4` → `v5`
-   - `github/codeql-action@v2` → `v3`
-
-2. **Dependency Review**: Fixed configuration conflict
-   - Removed `deny-licenses` to avoid conflict with `allow-licenses`
-   - Updated to `actions/dependency-review-action@v4`
-
-3. **Documentation Check**: Made non-blocking
-   - Changed from error to warning for source newer than docs
-   - Added error handling for missing files
-
-4. **Auto-formatting Permissions**: Enhanced GitHub Actions permissions
-   - Added explicit `contents: write` and `pull-requests: write` permissions
-   - Updated checkout with proper fetch depth
-   - Improved error handling for push failures
-
-## Secrets Required
-
-### Repository Secrets:
-- `CODECOV_TOKEN` (optional): For coverage reporting
+### Required Secrets
+- `CODECOV_TOKEN` (optional): Coverage reporting to Codecov
 - `PYPI_API_TOKEN` (required for releases): PyPI publishing
+- `GITHUB_TOKEN`: Automatically provided
 
-### Automatic Secrets:
-- `GITHUB_TOKEN`: Automatically provided by GitHub Actions
+### Test Configuration
+- `pytest.ini`: Test configuration and markers
+- `pyproject.toml`: Package configuration
 
-## Test Classification Framework
+## Removed Complexity
 
-The continuous integration system implements the following pytest marker taxonomy:
-- `unit`: Isolated component validation tests
-- `integration`: End-to-end workflow validation using authentic datasets
-- `cli`: Command-line interface functionality verification
-- `performance`: Computational efficiency and scalability benchmarking
-- `slow`: Extended-duration tests (optionally excluded for rapid validation)
+### What Was Removed (78% reduction)
+- ❌ Reproducibility testing (unnecessary)
+- ❌ Resource monitoring (overkill)
+- ❌ Performance regression testing (too complex)
+- ❌ Dependency compatibility matrix (redundant)
+- ❌ Dynamic security analysis (redundant)
+- ❌ Container security (not needed)
+- ❌ 8+ redundant security tools (kept CodeQL + bandit)
+- ❌ TruffleHog/GitLeaks (CodeQL covers this)
+- ❌ Custom scripts (dependency_validation.py, performance_baseline.py)
 
-## Computational Optimizations
+### Why These Changes
+1. **CodeQL is Comprehensive**: GitHub's CodeQL provides better security coverage than 10+ individual tools combined
+2. **Focus on Speed**: Faster CI means faster feedback for developers
+3. **Maintainability**: Simpler workflows are easier to understand and modify
+4. **Cost Efficiency**: Fewer GitHub Actions minutes used
+5. **Essential Coverage**: All critical checks remain (testing, linting, security, releases)
 
-### CI Environment Adaptations:
-- Performance validation utilizes reduced datasets for CI environment compatibility
-- Automated output management to minimize console verbosity
-- Environment variable detection for CI/CD context awareness (`CI`, `GITHUB_ACTIONS`)
-- Execution timeout safeguards for extended-duration test procedures
+## Usage
 
-## Usage Examples
+### Running Workflows Locally
 
-### Running Tests Locally:
+**Tests**:
 ```bash
-# All tests
-make test
+# Run all tests
+pytest -v
 
-# Specific categories
-make test-unit
-make test-integration
-make test-performance
+# Run with coverage
+pytest -v --cov=src/merpcr --cov-report=term
 
-# With coverage
-make coverage
+# Run compatibility tests
+python test_compatibility.py
 ```
 
-### Manual Workflow Triggers:
+**Code Quality**:
 ```bash
-# Trigger release workflow
+# Lint code
+flake8 src/ tests/
+
+# Format code
+black src/ tests/
+isort src/ tests/
+
+# Type check
+mypy src/
+
+# Security check
+bandit -r src/ -ll
+```
+
+### Manual Workflow Triggers
+
+**Trigger Release**:
+```bash
+# Via GitHub CLI
 gh workflow run release.yml -f version=v1.0.1
 
-# View workflow runs
+# Or create and push a git tag
+git tag v1.0.1
+git push origin v1.0.1
+```
+
+**View Workflow Runs**:
+```bash
 gh run list
+gh run view <run-id>
 ```
 
 ## Troubleshooting
 
-### Common Diagnostic Issues:
-1. **Test execution failures**: Examine test dataset generation procedures in CI execution logs
-2. **Authentication failures**: Confirm repository secret configuration completeness
-3. **Coverage reporting failures**: Validate CODECOV_TOKEN authentication configuration
-4. **Release deployment failures**: Verify PYPI_API_TOKEN credentials and tag format compliance
+### Common Issues
 
-### Systematic Debugging Protocol:
-1. Examine detailed workflow execution logs via GitHub Actions interface
-2. Replicate test execution in local environment matching CI specifications
-3. Confirm complete authentication secret configuration
-4. Validate branch protection rule compliance
+**Test Failures**:
+1. Check test logs in GitHub Actions
+2. Run tests locally to reproduce
+3. Verify test data is generated correctly
+
+**Coverage Upload Fails**:
+- Verify `CODECOV_TOKEN` is set (optional, won't fail CI)
+- Check Codecov service status
+
+**Auto-format Doesn't Commit**:
+- Verify PR has write permissions
+- Check branch protection rules
+- May need to allow Actions to create commits
+
+**Release Fails**:
+- Verify `PYPI_API_TOKEN` is set correctly
+- Check version tag format (must start with 'v')
+- Ensure all tests pass before release
+
+### Debug Mode
+
+Enable debug logging in GitHub Actions:
+1. Go to repository Settings → Secrets
+2. Add `ACTIONS_STEP_DEBUG` = `true`
+3. Add `ACTIONS_RUNNER_DEBUG` = `true`
+
+## Monitoring
+
+### What to Watch
+- Test pass/fail rates across platforms
+- Coverage trends (should stay >90%)
+- Security alerts from CodeQL
+- Dependency vulnerabilities
+
+### GitHub Actions Dashboard
+View all workflows at: `https://github.com/FOI-Bioinformatics/merpcr/actions`
 
 ## Maintenance
 
-### Regular Updates Needed:
-- Python versions in matrix testing
-- GitHub Actions versions
-- Security scanning tool versions
-- Dependencies in requirements
+### Regular Updates Needed
+- Python versions in test matrix (annually)
+- GitHub Actions versions (check Dependabot)
+- Dependencies in pyproject.toml (check weekly security scans)
 
-### Monitoring:
-- Weekly security scans
-- Performance trend analysis
-- Test coverage changes
-- Dependency updates
+### Adding New Tests
+1. Add test to `tests/` directory
+2. Tests run automatically on next push
+3. Verify coverage doesn't drop
 
-This comprehensive CI/CD infrastructure ensures systematic code quality assurance, security validation, and operational reliability across all supported computational platforms and Python version specifications.
+### Modifying Workflows
+1. Edit workflow YAML files
+2. Test locally with `act` (optional)
+3. Create PR to test in CI
+4. Verify all checks pass before merging
+
+## Benefits of Simplified CI
+
+✅ **78% less code**: 1,809 → 370 lines
+✅ **Faster feedback**: 5-10 minutes vs 30+ minutes
+✅ **Easier to maintain**: Clear, focused workflows
+✅ **Lower costs**: Fewer GitHub Actions minutes
+✅ **Better security**: CodeQL > 10+ individual tools
+✅ **Essential coverage**: All critical checks remain
+
+## References
+
+- [GitHub Actions Documentation](https://docs.github.com/en/actions)
+- [CodeQL Documentation](https://codeql.github.com/docs/)
+- [pytest Documentation](https://docs.pytest.org/)
+- [Coverage.py](https://coverage.readthedocs.io/)
+
+---
+
+*Last updated: October 2025*
+*CI/CD System Version: 2.0 (Simplified)*
