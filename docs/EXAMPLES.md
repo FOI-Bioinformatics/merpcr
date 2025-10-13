@@ -70,7 +70,7 @@ This tutorial provides systematic guidance for initial merPCR implementation and
 
 ```bash
 # Repository acquisition
-git clone https://github.com/yourusername/merpcr.git
+git clone https://github.com/FOI-Bioinformatics/merpcr.git
 cd merpcr
 
 # Development environment installation

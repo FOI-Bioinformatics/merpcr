@@ -52,14 +52,24 @@ class TestHashFunctions(unittest.TestCase):
         self.assertEqual(offset, -1)  # Should fail due to R
 
     def test_hash_value_longer_sequence(self):
-        """Test hash computation with longer sequences."""
-        # Should find hash in the first valid position
-        offset, hash_val = self.mer_pcr._hash_value("ATCGATCGATCG")
-        self.assertEqual(offset, 0)  # Uses first 8 bases
+        """
+        Test hash computation with longer sequences.
 
-        # Should skip ambiguous start and find hash later
+        Hash search now uses BACKWARD search (matches me-PCR):
+        - Starts from rightmost position (primer_len - wordsize)
+        - Searches backwards for first valid hash
+        """
+        # "ATCGATCGATCG" (12 bases, wordsize=8)
+        # Backward search starts at position 12-8=4
+        # Positions 4-11: "TCGATCG" is valid, so uses offset=4
+        offset, hash_val = self.mer_pcr._hash_value("ATCGATCGATCG")
+        self.assertEqual(offset, 4)  # Uses rightmost 8 bases (backward search)
+
+        # "NNNATCGATCGATCG" (15 bases with 3 N's at start, wordsize=8)
+        # Backward search starts at position 15-8=7
+        # Positions 7-14: "ATCGATCG" is valid (no N's), so uses offset=7
         offset, hash_val = self.mer_pcr._hash_value("NNNATCGATCGATCG")
-        self.assertEqual(offset, 3)  # Skips the N's
+        self.assertEqual(offset, 7)  # Uses rightmost valid position (backward search)
 
     def test_hash_value_too_short(self):
         """Test hash computation with sequences too short."""

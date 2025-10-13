@@ -13,7 +13,7 @@ Methodological guide for merPCR implementation:
 - Computational performance considerations
 - Diagnostic procedures and troubleshooting
 
-### 📚 [API Reference](API.md) 
+### 📚 [API Reference](API.md)
 Technical specification documentation:
 - Class definitions and method signatures
 - Parameter validation and type requirements
@@ -28,6 +28,30 @@ Practical implementation demonstrations:
 - Programmatic API utilization examples
 - High-throughput processing methodologies
 - Advanced analytical techniques and optimizations
+
+### ✅ [Verification Report](VERIFICATION.md)
+Compatibility testing and validation results:
+- Detailed comparison with me-PCR v1.0.6
+- Three critical algorithmic fixes documented
+- Real genomic data validation (42 genomes)
+- Test coverage and methodology
+- Performance benchmarks
+
+### 🔄 [Migration Guide](MIGRATION.md)
+Guide for transitioning from me-PCR to merPCR:
+- Drop-in replacement instructions
+- Command-line compatibility details
+- Common migration scenarios
+- Troubleshooting migration issues
+- Benefits and FAQ
+
+### ⚙️ [CI/CD Documentation](CI_CD.md)
+GitHub Actions workflow documentation:
+- Continuous integration pipeline
+- Code quality assurance
+- Security assessment framework
+- Release management
+- Troubleshooting CI/CD issues
 
 ## Navigation Guide
 

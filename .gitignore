@@ -268,6 +268,8 @@ test_output/
 test_results/
 *.test
 *.log
+output.txt
+stdout
 
 # Coverage files (additional)
 .coverage.html

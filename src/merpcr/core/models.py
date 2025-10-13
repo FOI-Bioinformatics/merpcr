@@ -27,6 +27,7 @@ class STSRecord:
     hash_offset: int = 0  # Offset of hash word within primer
     direct: str = "+"  # Orientation: '+' for forward, '-' for reverse
     ambig_primer: int = 0  # Flags indicating which primers have ambiguities
+    margin: int = 0  # Per-STS margin (may be adjusted for PCR size ranges)
 
 
 @dataclass

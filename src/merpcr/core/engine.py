@@ -233,9 +233,12 @@ class MerPCR:
                 primer1 = fields[1].upper()
                 primer2 = fields[2].upper()
 
-                # Parse PCR size
-                pcr_size = self._parse_pcr_size(fields[3])
+                # Parse PCR size and get margin adjustment for ranges
+                pcr_size, margin_adjustment = self._parse_pcr_size(fields[3])
                 alias = fields[4] if len(fields) > 4 else ""
+
+                # Calculate margin to use for this STS (base margin + adjustment for ranges)
+                margin_to_use = self.margin + margin_adjustment
 
                 # Check if primer length and PCR size are valid
                 if len(primer1) < self.wordsize or len(primer2) < self.wordsize:
@@ -251,6 +254,11 @@ class MerPCR:
                     self.max_pcr_size = pcr_size
 
                 # Create STS record for forward direction
+                # For forward hits: search for primer1 (forward) followed by primer2_rc
+                # For reverse hits: search for primer2 (forward) followed by primer1_rc
+                rev_primer1 = self._reverse_complement(primer1)
+                rev_primer2 = self._reverse_complement(primer2)
+
                 sts = STSRecord(
                     id=sts_id,
                     primer1=primer1,
@@ -259,18 +267,19 @@ class MerPCR:
                     alias=alias,
                     offset=line_no,
                     direct="+",
+                    margin=margin_to_use,
                 )
 
-                # Forward primer hash
+                # Forward primer hash: search for primer1 followed by primer2_rc
                 hash_offset1, hash_value1 = self._hash_value(primer1)
                 if hash_offset1 >= 0:
                     sts_for = STSRecord(**{**vars(sts), "hash_offset": hash_offset1, "direct": "+"})
+                    sts_for.primer2 = rev_primer2  # Store reverse complement for forward direction
                     self._insert_sts(sts_for, hash_value1)
                 else:
                     bad_primers_ambig += 1
 
                 # Reverse direction: search for primer2 (forward) followed by primer1_rc
-                rev_primer1 = self._reverse_complement(primer1)
                 hash_offset2, hash_value2 = self._hash_value(primer2)
                 if hash_offset2 >= 0:
                     sts_rev = STSRecord(**{**vars(sts), "hash_offset": hash_offset2, "direct": "-"})
@@ -301,25 +310,48 @@ class MerPCR:
         )
         return True
 
-    def _parse_pcr_size(self, pcr_size_str: str) -> int:
-        """Parse PCR size from string, handling ranges."""
+    def _parse_pcr_size(self, pcr_size_str: str) -> tuple[int, int]:
+        """
+        Parse PCR size from string, handling ranges.
+
+        This matches me-PCR's behavior (stsmatch.cpp:1007-1031):
+        - For single values: returns (pcr_size, 0)
+        - For ranges like "200-220": returns (average, margin_adjustment)
+
+        The margin adjustment is calculated as: (high - average + 1)
+        This ensures the search range covers the full expected size range.
+
+        Args:
+            pcr_size_str: PCR size string (e.g., "240", "200-220", "-", "0")
+
+        Returns:
+            Tuple of (pcr_size, margin_adjustment)
+        """
         if "-" in pcr_size_str:
             try:
                 size_range = pcr_size_str.split("-")
                 if len(size_range) == 2 and size_range[0] and size_range[1]:
                     low = int(size_range[0])
                     high = int(size_range[1])
-                    return (low + high) // 2
+                    # Calculate average PCR size
+                    pcr_size = (low + high) // 2
+                    # Calculate margin adjustment (matches me-PCR line 1021)
+                    margin_adjustment = high - pcr_size + 1
+                    return pcr_size, margin_adjustment
                 else:
-                    return self.default_pcr_size
+                    # Just a dash with no valid range
+                    return self.default_pcr_size, 0
             except ValueError:
-                return self.default_pcr_size
+                return self.default_pcr_size, 0
         else:
             try:
                 pcr_size = int(pcr_size_str)
-                return pcr_size if pcr_size > 0 else self.default_pcr_size
+                if pcr_size > 0:
+                    return pcr_size, 0
+                else:
+                    return self.default_pcr_size, 0
             except ValueError:
-                return self.default_pcr_size
+                return self.default_pcr_size, 0
 
     def _insert_sts(self, sts: STSRecord, hash_value: int):
         """Insert an STS record into the hash table."""
@@ -329,29 +361,60 @@ class MerPCR:
         self.sts_records.append(sts)
 
     def _hash_value(self, primer: str) -> tuple[int, int]:
-        """Compute a hash value for the specified primer."""
+        """
+        Compute a hash value for the specified primer using backward search.
+
+        This implements the me-PCR algorithm from stsmatch.cpp:1204-1240:
+        - Start at offset = primer_len - wordsize (rightmost position)
+        - Search backwards for a valid hash without ambiguous bases
+        - When ambiguity found at position i within word, jump back by (wordsize - i - 1)
+        - Return (offset, hash_value) or (-1, 0) if no valid hash found
+
+        The backward search is critical for me-PCR compatibility because it determines
+        which part of the primer is used for hash lookup, directly affecting search results.
+
+        Args:
+            primer: The primer sequence to hash
+
+        Returns:
+            Tuple of (offset, hash_value) where offset is position in primer where
+            the hash word starts, or (-1, 0) if no valid hash can be computed.
+        """
         primer = primer.upper()
         primer_len = len(primer)
         if primer_len < self.wordsize:
             return -1, 0
 
-        # Try all possible positions for the hash word
-        for offset in range(primer_len - self.wordsize + 1):
-            hash_value = 0
-            valid_hash = True
+        # Start from the rightmost possible position (backward search algorithm)
+        offset = primer_len - self.wordsize
 
-            for i in range(self.wordsize):
+        while offset >= 0:
+            hash_value = 0
+            i = 0
+
+            # Try to compute hash from this offset
+            while i < self.wordsize:
                 base = primer[offset + i]
                 code = self.scode[ord(base)]
+
                 if code == AMBIG:
-                    valid_hash = False
+                    # Found ambiguity at position i within the word
+                    # Jump back by (wordsize - i - 1) as per me-PCR algorithm
+                    # This matches stsmatch.cpp line 1222
+                    offset -= self.wordsize - i - 1
                     break
 
                 hash_value = (hash_value << 2) | code
+                i += 1
 
-            if valid_hash:
+            if i == self.wordsize:
+                # Successfully computed a valid hash
                 return offset, hash_value
 
+            # Decrement offset (matches stsmatch.cpp line 1229)
+            offset -= 1
+
+        # No valid hash found
         return -1, 0
 
     def _reverse_complement(self, sequence: str) -> str:
@@ -524,7 +587,9 @@ class MerPCR:
             if avail_length < len_p2:
                 return 0  # Not enough room for second primer
 
-            # Calculate margins for searching
+            # Calculate margins for searching using STS-specific margin
+            # Each STS may have its own margin (especially for PCR size ranges)
+            sts_margin = sts.margin if sts.margin > 0 else self.margin
             actual_size = avail_length + len_p1  # Total available size including primer1
 
             # For small sequences, adjust the expected size to not exceed available sequence
@@ -532,10 +597,10 @@ class MerPCR:
                 exp_size = actual_size
                 hi_margin = 0
             else:
-                hi_margin = min(self.margin, seq_len - k - exp_size)
+                hi_margin = min(sts_margin, seq_len - k - exp_size)
 
             # Ensure lo_margin doesn't push second primer before the end of first primer
-            lo_margin = min(self.margin, exp_size - len_p1 - len_p2)
+            lo_margin = min(sts_margin, exp_size - len_p1 - len_p2)
             if lo_margin < 0:
                 lo_margin = 0
 
@@ -559,8 +624,8 @@ class MerPCR:
             else:
                 count = 0
 
-            # Try positions within the margin
-            for i in range(1, self.margin + 1):
+            # Try positions within the margin (use STS-specific margin)
+            for i in range(1, sts_margin + 1):
                 # Try lower margin
                 if i <= lo_margin:
                     p2_pos = k + exp_size - len_p2 - i
