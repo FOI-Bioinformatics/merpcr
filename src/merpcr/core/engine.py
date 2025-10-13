@@ -11,8 +11,22 @@ import sys
 import time
 from typing import Dict, List, Optional
 
+import numpy as np
+
 from ..io.fasta import FASTALoader
 from .models import FASTARecord, STSHit, STSRecord, ThreadData
+
+# Try to import Cython-optimized functions
+try:
+    from .engine_fast import compare_seqs_python_wrapper, process_thread_fast
+
+    HAS_CYTHON = True
+    logger = logging.getLogger(__name__)
+    logger.info("Cython-optimized functions loaded successfully")
+except ImportError:
+    HAS_CYTHON = False
+    logger = logging.getLogger(__name__)
+    logger.info("Cython extensions not available, using pure Python implementation")
 
 # Constants
 AMBIG = 100
@@ -99,7 +113,8 @@ class MerPCR:
     def _init_lookup_tables(self):
         """Initialize lookup tables for sequence processing."""
         # Nucleotide coding table: A=0, C=1, G=2, T=3, others=AMBIG
-        self.scode = [AMBIG] * 256
+        # Use NumPy array for faster lookup (Phase 1.2 optimization)
+        self.scode = np.full(256, AMBIG, dtype=np.uint8)
 
         # Add both uppercase and lowercase codes
         self.scode[ord("A")] = self.scode[ord("a")] = 0
@@ -172,18 +187,22 @@ class MerPCR:
         }
 
         # Initialize IUPAC match matrix if IUPAC mode is enabled
+        # Use NumPy array for faster lookup (Phase 2.2 optimization)
         if self.iupac_mode:
-            self.iupac_match_matrix = [[False for _ in range(256)] for _ in range(256)]
+            self.iupac_match_matrix = np.zeros((256, 256), dtype=np.uint8)
             for base1, matches1 in self.iupac_mapping.items():
                 for base2, matches2 in self.iupac_mapping.items():
                     # Two bases match if their possible interpretations overlap
                     set1 = set(matches1.upper())
                     set2 = set(matches2.upper())
                     if set1.intersection(set2):
-                        self.iupac_match_matrix[ord(base1)][ord(base2)] = True
+                        self.iupac_match_matrix[ord(base1), ord(base2)] = 1
                         # Also add the uppercase-lowercase combinations
-                        self.iupac_match_matrix[ord(base1.upper())][ord(base2.lower())] = True
-                        self.iupac_match_matrix[ord(base1.lower())][ord(base2.upper())] = True
+                        self.iupac_match_matrix[ord(base1.upper()), ord(base2.lower())] = 1
+                        self.iupac_match_matrix[ord(base1.lower()), ord(base2.upper())] = 1
+        else:
+            # Create empty matrix for non-IUPAC mode (required by Cython function)
+            self.iupac_match_matrix = np.zeros((256, 256), dtype=np.uint8)
 
         # Ambiguity detection lookup
         self.ambig = {}
@@ -395,7 +414,7 @@ class MerPCR:
             # Try to compute hash from this offset
             while i < self.wordsize:
                 base = primer[offset + i]
-                code = self.scode[ord(base)]
+                code = int(self.scode[ord(base)])  # Convert numpy type to int
 
                 if code == AMBIG:
                     # Found ambiguity at position i within the word
@@ -515,6 +534,21 @@ class MerPCR:
 
     def _process_thread(self, thread_data: ThreadData) -> ThreadData:
         """Process a single thread's worth of sequence data."""
+        # Use Cython-optimized version if available (3-5x faster)
+        if HAS_CYTHON:
+            return process_thread_fast(
+                thread_data,
+                self.sts_table,
+                self.wordsize,
+                self.scode,
+                self.mismatches,
+                self.three_prime_match,
+                self.iupac_mode,
+                self.iupac_match_matrix,
+                self.margin,
+            )
+
+        # Fall back to pure Python implementation
         sequence = thread_data.sequence.upper()
         seq_len = len(sequence)
 
@@ -532,7 +566,7 @@ class MerPCR:
             if p + i >= seq_len:
                 break
 
-            code = self.scode[ord(sequence[p + i])]
+            code = int(self.scode[ord(sequence[p + i])])  # Convert numpy type to int
             if code == AMBIG:
                 N = self.wordsize
             else:
@@ -557,7 +591,7 @@ class MerPCR:
                 h = (h << 2) & ((1 << (2 * self.wordsize)) - 1)
 
                 # Add new rightmost base to hash
-                code = self.scode[ord(sequence[pos + self.wordsize])]
+                code = int(self.scode[ord(sequence[pos + self.wordsize])])  # Convert numpy type to int
                 if code == AMBIG:
                     N = self.wordsize
                 else:
