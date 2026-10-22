@@ -39,7 +39,7 @@ merpcr primers.sts genome.fa -O hits.txt        # write results to a file
 | `-O` | `O=` | stdout | Output file |
 | `-Q` | `Q=` | 1 | 0 prints progress messages, 1 is quiet |
 
-The STS file is tab-delimited with the fields identifier, forward primer, reverse primer, expected product size and an optional annotation. The output has one line per hit:
+The STS file is tab-delimited with the fields identifier, forward primer, reverse primer, expected product size and an optional annotation. Both input files may be compressed with gzip, bzip2 or xz. The output has one line per hit:
 
 ```
 L78833	75823..76023	AFM248yg9	(D17S932)  Chr.17, 63.7 cM	(-)

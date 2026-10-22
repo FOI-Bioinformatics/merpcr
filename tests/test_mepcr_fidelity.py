@@ -273,3 +273,39 @@ class TestFindHits:
             lines = fh.read().splitlines()
         assert count == len(lines) == len(engine.hits)
         assert lines == [h.format() for h in engine.find_hits(records)]
+
+
+class TestCompressedInput:
+    @pytest.mark.parametrize("suffix", [".gz", ".bz2", ".xz"])
+    def test_compressed_sts_and_fasta_give_same_hits(self, tmpdir_path, suffix):
+        import bz2
+        import gzip
+        import lzma
+
+        openers = {".gz": gzip.open, ".bz2": bz2.open, ".xz": lzma.open}
+        sts_text = f"S1\t{P1}\t{P2}\t200\tAL\n"
+        fasta_text = ">seq1\n" + planted_sequence() + "\n"
+        plain = run_search(sts_text, fasta_text, tmpdir_path)
+
+        sts = os.path.join(tmpdir_path, "c.sts" + suffix)
+        fa = os.path.join(tmpdir_path, "c.fa" + suffix)
+        with openers[suffix](sts, "wt") as fh:
+            fh.write(sts_text)
+        with openers[suffix](fa, "wt") as fh:
+            fh.write(fasta_text)
+
+        engine = MerPCR()
+        assert engine.load_sts_file(sts)
+        records = engine.load_fasta_file(fa)
+        assert engine._fasta_file_size is None
+        assert (
+            [h.format() for h in engine.find_hits(records)]
+            == plain
+            == ["seq1\t101..300\tS1\tAL\t(+)"]
+        )
+
+    def test_plain_file_still_uses_size_on_disk(self, tmpdir_path):
+        fa = write(os.path.join(tmpdir_path, "p.fa"), ">seq1\n" + planted_sequence() + "\n")
+        engine = MerPCR()
+        engine.load_fasta_file(fa)
+        assert engine._fasta_file_size == os.path.getsize(fa)

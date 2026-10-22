@@ -9,6 +9,7 @@ import time
 from typing import List
 
 from ..core.models import FASTARecord
+from .files import open_text
 
 logger = logging.getLogger(__name__)
 
@@ -45,7 +46,7 @@ class FASTALoader:
         current_defline = None
         current_sequence = []
 
-        with open(filename, "r") as file:
+        with open_text(filename) as file:
             for line in file:
                 line = line.strip()
 

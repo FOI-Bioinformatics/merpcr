@@ -27,7 +27,7 @@ AFM248yg9	GCTAAAAATACACGGATGG	TGCAAGACTGCGTCTC	193	(D17S932) Chr.17, 63.7 cM
 
 ### FASTA file
 
-Standard FASTA with one or more records. The sequence label is the text between `>` and the first space or tab. Sequence lines are upper-cased and filtered with the me-PCR nucleotide alphabet `GATCNBDHKMRSVWY-`: other characters, including `X` and `U`, are removed, while the gap character `-` is kept and occupies a position.
+Standard FASTA with one or more records. Files ending in `.gz`, `.bz2`, `.xz` or `.lzma` are decompressed while reading; the same applies to the STS file. The sequence label is the text between `>` and the first space or tab. Sequence lines are upper-cased and filtered with the me-PCR nucleotide alphabet `GATCNBDHKMRSVWY-`: other characters, including `X` and `U`, are removed, while the gap character `-` is kept and occupies a position.
 
 ## Output
 
