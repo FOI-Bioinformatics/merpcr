@@ -21,7 +21,7 @@ AFM248yg9	GCTAAAAATACACGGATGG	TGCAAGACTGCGTCTC	193	(D17S932) Chr.17, 63.7 cM
 - Both primers are given 5' to 3'. Lower-case letters are accepted. IUPAC ambiguity codes are allowed and are interpreted when `-I 1` is set.
 - The product size is the length of the amplicon including both primers. A value of `0` or `-` means unknown, and the default size (`-Z`, 240 bp) is used. A range such as `142-148` is replaced by its mean, and the margin for that marker is widened by `high - mean + 1` so that the whole range is covered.
 - If the sum of the primer lengths exceeds the product size, the size is raised to that sum and a warning is logged.
-- A primer shorter than the word size cannot be searched for; the marker is skipped with a warning. A marker whose forward primer contains no window of `W` unambiguous bases is skipped as well.
+- A primer shorter than the word size cannot be searched for; the marker is skipped with a warning. A marker whose forward primer contains no window of `W` unambiguous bases is skipped as well, unless `-U 1` is set; it is then searched on the one strand its reverse primer allows and a warning reports how many markers were treated this way. The alternative is a smaller `-W`, which applies to every marker and slows the scan.
 - The annotation is everything after the fourth tab, including further tabs, and is reproduced verbatim in the output.
 - Lines starting with `#` and blank lines are ignored. Lines longer than the `-S` limit (1022 characters by default) are an error, as in me-PCR.
 
