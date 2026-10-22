@@ -10,9 +10,17 @@ from unittest.mock import patch
 
 import pytest
 
-from merpcr.cli import (convert_mepcr_arguments, create_parser, main,
-                        margin_type, mismatch_type, pcr_size_type,
-                        sts_line_length_type, threads_type, wordsize_type)
+from merpcr.cli import (
+    convert_mepcr_arguments,
+    create_parser,
+    main,
+    margin_type,
+    mismatch_type,
+    pcr_size_type,
+    sts_line_length_type,
+    threads_type,
+    wordsize_type,
+)
 
 
 class TestArgumentConversion:

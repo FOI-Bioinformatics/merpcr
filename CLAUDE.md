@@ -149,7 +149,7 @@ src/merpcr/
 ### Production Configuration
 
 #### System Requirements
-- **Python**: 3.11+ (tested on 3.11-3.13)
+- **Python**: 3.13+
 - **Memory**: Scales with dataset size, ~1GB for human genome
 - **CPU**: Multithreading benefits from 2+ cores
 - **Storage**: Handles files up to several GB

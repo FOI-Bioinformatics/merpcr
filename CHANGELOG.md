@@ -40,6 +40,10 @@ regression tests in tests/test_mepcr_fidelity.py document the corrections.
 - Documentation consolidated into README.md and five files under docs/.
   CI reduced to a test/lint/build workflow and a release workflow.
 
+### Requirements
+- Python 3.13 or later is required. Formatting and import order are now
+  enforced in CI with black and isort.
+
 ### Deliberate differences from me-PCR 1.0.6
 - PCR size ranges ("200-220") and "-" are accepted as described in the me-PCR
   source; the 1.0.6 binary rejects them with a format error.

@@ -54,7 +54,7 @@ Black with a line length of 100, isort, flake8. `make format` applies the format
 
 Two workflows in `.github/workflows`:
 
-- `ci.yml` runs on pushes and pull requests to `main`. The `test` job installs the package and runs pytest on Ubuntu with Python 3.11, 3.12 and 3.13, and on macOS and Windows with Python 3.12. The `lint` job runs black, isort and flake8 checks. The `build` job builds the source distribution and wheel and checks them with twine.
+- `ci.yml` runs on pushes and pull requests to `main`. The `test` job installs the package and runs pytest with Python 3.13 on Ubuntu, macOS and Windows. The `lint` job runs black, isort and flake8 checks. The `build` job builds the source distribution and wheel and checks them with twine.
 - `release.yml` runs when a tag `v*` is pushed. It builds the distributions, publishes them to PyPI through trusted publishing (the `pypi` environment must be configured on GitHub), and creates a GitHub release with the files attached.
 
 The differential test against me-PCR is not run in CI because it needs the compiled me-PCR binary.

@@ -13,6 +13,7 @@ Reference: me-PCR stsmatch.cpp lines 1007-1031
 """
 
 import pytest
+
 from merpcr.core.engine import MerPCR
 
 
@@ -114,8 +115,8 @@ class TestPCRRangeHandling:
     def test_sts_record_stores_adjusted_margin(self):
         """Test that STS records correctly store the adjusted margin."""
         # Create a test STS file with a range
-        import tempfile
         import os
+        import tempfile
 
         with tempfile.NamedTemporaryFile(mode="w", suffix=".sts", delete=False) as f:
             # Write STS with PCR size range
@@ -145,8 +146,8 @@ class TestPCRRangeHandling:
 
     def test_different_sts_different_margins(self):
         """Test that different STSs can have different margins."""
-        import tempfile
         import os
+        import tempfile
 
         with tempfile.NamedTemporaryFile(mode="w", suffix=".sts", delete=False) as f:
             # Write multiple STSs with different PCR sizes

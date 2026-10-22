@@ -7,10 +7,16 @@ import logging
 import sys
 from typing import List
 
-from .core.engine import (DEFAULT_IUPAC_MODE, DEFAULT_MARGIN,
-                          DEFAULT_MISMATCHES, DEFAULT_PCR_SIZE,
-                          DEFAULT_THREADS, DEFAULT_THREE_PRIME_MATCH,
-                          DEFAULT_WORDSIZE, MerPCR)
+from .core.engine import (
+    DEFAULT_IUPAC_MODE,
+    DEFAULT_MARGIN,
+    DEFAULT_MISMATCHES,
+    DEFAULT_PCR_SIZE,
+    DEFAULT_THREADS,
+    DEFAULT_THREE_PRIME_MATCH,
+    DEFAULT_WORDSIZE,
+    MerPCR,
+)
 
 # Default values for me-PCR compatibility
 DEFAULT_MAX_STS_LINE_LENGTH = 1022
