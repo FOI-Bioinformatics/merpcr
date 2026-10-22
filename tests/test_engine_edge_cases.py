@@ -51,7 +51,7 @@ class TestSTSLoadingEdgeCases:
         # Create STS with primers too short
         sts_content = "ShortSTS\tACGT\tGCAT\t100\tShort primers"
 
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.sts', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".sts", delete=False) as f:
             f.write(sts_content)
             sts_file = f.name
 
@@ -69,7 +69,7 @@ class TestSTSLoadingEdgeCases:
         # Create STS where primers are longer than PCR size
         sts_content = "BadSize\tACGTACGTACGTACGT\tGCATGCATGCATGCAT\t10\tBad PCR size"
 
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.sts', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".sts", delete=False) as f:
             f.write(sts_content)
             sts_file = f.name
 
@@ -87,7 +87,7 @@ class TestSTSLoadingEdgeCases:
         # Create STS with all ambiguous bases (no valid hash)
         sts_content = "AmbigSTS\tNNNNNNNNNNN\tNNNNNNNNNNN\t100\tAll N"
 
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.sts', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".sts", delete=False) as f:
             f.write(sts_content)
             sts_file = f.name
 
@@ -104,7 +104,7 @@ class TestSTSLoadingEdgeCases:
 
         sts_content = "BigPCR\tACGTACGTACGT\tGCATGCATGCAT\t500\tBig PCR"
 
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.sts', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".sts", delete=False) as f:
             f.write(sts_content)
             sts_file = f.name
 
@@ -192,15 +192,15 @@ class TestSearchEdgeCases:
             "NNNNNNNNNNATGCATGCATGC\n"
         )
 
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.sts', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".sts", delete=False) as f:
             f.write(sts_content)
             sts_file = f.name
 
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.fa', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".fa", delete=False) as f:
             f.write(fasta_content)
             fasta_file = f.name
 
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
             output_file = f.name
 
         try:
@@ -212,7 +212,7 @@ class TestSearchEdgeCases:
             assert Path(output_file).exists()
 
             # Verify output file was written and closed
-            with open(output_file, 'r') as f:
+            with open(output_file, "r") as f:
                 content = f.read()
                 assert len(content) > 0 if hit_count > 0 else True
 
@@ -229,11 +229,11 @@ class TestSearchEdgeCases:
         # Small sequence (< 100KB)
         fasta_content = ">small_seq\n" + "ACGT" * 100 + "\n"
 
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.sts', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".sts", delete=False) as f:
             f.write(sts_content)
             sts_file = f.name
 
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.fa', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".fa", delete=False) as f:
             f.write(fasta_content)
             fasta_file = f.name
 
@@ -255,11 +255,11 @@ class TestSearchEdgeCases:
         # Medium sequence where overlap would cause thread reduction
         fasta_content = ">medium_seq\n" + "ACGT" * 10000 + "\n"
 
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.sts', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".sts", delete=False) as f:
             f.write(sts_content)
             sts_file = f.name
 
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.fa', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".fa", delete=False) as f:
             f.write(fasta_content)
             fasta_file = f.name
 
@@ -281,12 +281,7 @@ class TestProcessThreadEdgeCases:
         """Test processing sequence shorter than wordsize."""
         engine = MerPCR(wordsize=11)
 
-        thread_data = ThreadData(
-            thread_id=0,
-            sequence="ACGT",  # Only 4 bases
-            offset=0,
-            length=4
-        )
+        thread_data = ThreadData(thread_id=0, sequence="ACGT", offset=0, length=4)  # Only 4 bases
 
         result = engine._process_thread(thread_data)
         assert len(result.hits) == 0
@@ -297,7 +292,7 @@ class TestProcessThreadEdgeCases:
 
         sts_content = "TestSTS\tACGTACGTACGT\tGCATGCATGCAT\t100\t"
 
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.sts', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".sts", delete=False) as f:
             f.write(sts_content)
             sts_file = f.name
 
@@ -307,12 +302,7 @@ class TestProcessThreadEdgeCases:
             # Sequence with ambiguous bases that will affect hash window
             sequence = "ACGTNNNNNNNNACGT" * 10
 
-            thread_data = ThreadData(
-                thread_id=0,
-                sequence=sequence,
-                offset=0,
-                length=len(sequence)
-            )
+            thread_data = ThreadData(thread_id=0, sequence=sequence, offset=0, length=len(sequence))
 
             result = engine._process_thread(thread_data)
             # Just verify it doesn't crash
@@ -327,7 +317,7 @@ class TestProcessThreadEdgeCases:
 
         sts_content = "TestSTS\tACGTACGTACGT\tGCATGCATGCAT\t100\t"
 
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.sts', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".sts", delete=False) as f:
             f.write(sts_content)
             sts_file = f.name
 
@@ -337,12 +327,7 @@ class TestProcessThreadEdgeCases:
             # Sequence exactly long enough for one hash window
             sequence = "ACGTACGTACGT"  # Exactly 12 bases
 
-            thread_data = ThreadData(
-                thread_id=0,
-                sequence=sequence,
-                offset=0,
-                length=len(sequence)
-            )
+            thread_data = ThreadData(thread_id=0, sequence=sequence, offset=0, length=len(sequence))
 
             result = engine._process_thread(thread_data)
             assert isinstance(result, ThreadData)
@@ -360,7 +345,7 @@ class TestMatchSTSEdgeCases:
 
         sts_content = "TestSTS\tACGTACGTACGT\tGCATGCATGCATGCAT\t200\t"  # Long primer2
 
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.sts', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".sts", delete=False) as f:
             f.write(sts_content)
             sts_file = f.name
 
@@ -370,12 +355,7 @@ class TestMatchSTSEdgeCases:
             # Sequence too short after primer1
             sequence = "ACGTACGTACGTNN"  # Just barely fits primer1, not primer2
 
-            thread_data = ThreadData(
-                thread_id=0,
-                sequence=sequence,
-                offset=0,
-                length=len(sequence)
-            )
+            thread_data = ThreadData(thread_id=0, sequence=sequence, offset=0, length=len(sequence))
 
             result = engine._process_thread(thread_data)
             # Should not crash, just return no hits
@@ -390,7 +370,7 @@ class TestMatchSTSEdgeCases:
 
         sts_content = "TestSTS\tACGTACGTACGT\tGCATGCATGCAT\t50\t"
 
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.sts', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".sts", delete=False) as f:
             f.write(sts_content)
             sts_file = f.name
 
@@ -400,12 +380,7 @@ class TestMatchSTSEdgeCases:
             # Sequence that will exercise margin calculations
             sequence = "ACGTACGTACGT" + "N" * 30 + "ATGCATGCATGC"
 
-            thread_data = ThreadData(
-                thread_id=0,
-                sequence=sequence,
-                offset=0,
-                length=len(sequence)
-            )
+            thread_data = ThreadData(thread_id=0, sequence=sequence, offset=0, length=len(sequence))
 
             result = engine._process_thread(thread_data)
             assert isinstance(result, ThreadData)
@@ -420,7 +395,7 @@ class TestMatchSTSEdgeCases:
         # Large expected PCR size
         sts_content = "TestSTS\tACGTACGTACGT\tGCATGCATGCAT\t5000\t"
 
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.sts', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".sts", delete=False) as f:
             f.write(sts_content)
             sts_file = f.name
 
@@ -430,12 +405,7 @@ class TestMatchSTSEdgeCases:
             # Small sequence (much smaller than expected PCR size)
             sequence = "ACGTACGTACGT" + "N" * 50 + "ATGCATGCATGC"
 
-            thread_data = ThreadData(
-                thread_id=0,
-                sequence=sequence,
-                offset=0,
-                length=len(sequence)
-            )
+            thread_data = ThreadData(thread_id=0, sequence=sequence, offset=0, length=len(sequence))
 
             result = engine._process_thread(thread_data)
             assert isinstance(result, ThreadData)
@@ -474,20 +444,27 @@ class TestIUPACMode:
         """Test IUPAC R code (A or G)."""
         engine = MerPCR(wordsize=11, iupac_mode=1, mismatches=0)
 
-        # R should match both A and G
-        assert engine._compare_seqs("R", "A", "+") is True
-        assert engine._compare_seqs("R", "G", "+") is True
-        assert engine._compare_seqs("R", "C", "+") is False
+        # A primer R matches sequence A or G. The first argument is the sequence
+        # window and the second the primer; as in me-PCR, an ambiguity code in the
+        # sequence does not match a plain primer base.
+        assert engine._compare_seqs("A", "R", "+") is True
+        assert engine._compare_seqs("G", "R", "+") is True
+        assert engine._compare_seqs("C", "R", "+") is False
+        assert engine._compare_seqs("R", "A", "+") is False
 
     def test_iupac_mode_with_three_prime_protection(self):
         """Test IUPAC mode combined with 3' protection."""
         engine = MerPCR(wordsize=11, iupac_mode=1, mismatches=0, three_prime_match=2)
 
-        # In IUPAC mode, N matches any base, so this actually should succeed
-        seq1 = "ACGTACGTNN"  # N at 3' end
-        seq2 = "ACGTACGTAA"
+        # A primer N matches any sequence base, also in the protected 3' region
+        seq1 = "ACGTACGTAA"
+        seq2 = "ACGTACGTNN"  # N at the 3' end of the primer
         result = engine._compare_seqs(seq1, seq2, "+")
-        assert result is True, "N should match A in IUPAC mode"
+        assert result is True, "primer N should match A in IUPAC mode"
+
+        # N in the sequence does not match a plain primer base (me-PCR semantics)
+        result = engine._compare_seqs("ACGTACGTNN", "ACGTACGTAA", "+")
+        assert result is False
 
         # Test actual mismatch in 3' region (non-matching bases)
         seq1 = "ACGTACGTAC"
@@ -499,11 +476,11 @@ class TestIUPACMode:
         """Test IUPAC N code (any base)."""
         engine = MerPCR(wordsize=11, iupac_mode=1)
 
-        # N should match any base
-        assert engine._compare_seqs("N", "A", "+") is True
-        assert engine._compare_seqs("N", "C", "+") is True
-        assert engine._compare_seqs("N", "G", "+") is True
-        assert engine._compare_seqs("N", "T", "+") is True
+        # A primer N matches any sequence base
+        assert engine._compare_seqs("A", "N", "+") is True
+        assert engine._compare_seqs("C", "N", "+") is True
+        assert engine._compare_seqs("G", "N", "+") is True
+        assert engine._compare_seqs("T", "N", "+") is True
 
 
 class TestMultithreading:
@@ -519,11 +496,11 @@ class TestMultithreading:
         large_sequence = "ACGT" * 30000  # ~120KB
         fasta_content = f">large_seq\n{large_sequence}\n"
 
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.sts', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".sts", delete=False) as f:
             f.write(sts_content)
             sts_file = f.name
 
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.fa', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".fa", delete=False) as f:
             f.write(fasta_content)
             fasta_file = f.name
 
@@ -546,11 +523,11 @@ class TestMultithreading:
         large_sequence = "ACGT" * 30000
         fasta_content = f">large_seq\n{large_sequence}\n"
 
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.sts', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".sts", delete=False) as f:
             f.write(sts_content)
             sts_file = f.name
 
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.fa', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".fa", delete=False) as f:
             f.write(fasta_content)
             fasta_file = f.name
 

@@ -29,7 +29,7 @@ class TestForwardStrandMatching:
         # Create a simple STS file
         sts_content = "TestSTS\tACGTACGTACGT\tGCATGCATGCAT\t100\tTest"
 
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.sts', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".sts", delete=False) as f:
             f.write(sts_content)
             sts_file = f.name
 
@@ -55,8 +55,9 @@ class TestForwardStrandMatching:
             # primer2 original: GCATGCATGCAT
             # primer2 RC: ATGCATGCATGC
             expected_primer2_rc = "ATGCATGCATGC"
-            assert forward_sts.primer2 == expected_primer2_rc, \
-                f"Forward primer2 should be reverse complement, got {forward_sts.primer2}"
+            assert (
+                forward_sts.primer2 == expected_primer2_rc
+            ), f"Forward primer2 should be reverse complement, got {forward_sts.primer2}"
 
         finally:
             Path(sts_file).unlink()
@@ -81,11 +82,11 @@ class TestForwardStrandMatching:
 
         fasta_content = f">test_seq\n{sequence}\n"
 
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.sts', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".sts", delete=False) as f:
             f.write(sts_content)
             sts_file = f.name
 
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.fa', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".fa", delete=False) as f:
             f.write(fasta_content)
             fasta_file = f.name
 
@@ -102,6 +103,7 @@ class TestForwardStrandMatching:
                 seq_len = len(sequence)
 
                 from merpcr.core.models import ThreadData
+
                 thread_data = ThreadData(thread_id=0, sequence=sequence, offset=0, length=seq_len)
                 engine._process_thread(thread_data)
                 hits.extend(thread_data.hits)
@@ -140,11 +142,11 @@ class TestForwardStrandMatching:
             "NNNNNNNNNNATGCATGCATGC\n"
         )
 
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.sts', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".sts", delete=False) as f:
             f.write(sts_content)
             sts_file = f.name
 
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.fa', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".fa", delete=False) as f:
             f.write(fasta_content)
             fasta_file = f.name
 
@@ -154,13 +156,11 @@ class TestForwardStrandMatching:
             records = engine.load_fasta_file(fasta_file)
 
             from merpcr.core.models import ThreadData
+
             hits = []
             for record in records:
                 thread_data = ThreadData(
-                    thread_id=0,
-                    sequence=record.sequence,
-                    offset=0,
-                    length=len(record.sequence)
+                    thread_id=0, sequence=record.sequence, offset=0, length=len(record.sequence)
                 )
                 engine._process_thread(thread_data)
                 hits.extend(thread_data.hits)
@@ -189,11 +189,11 @@ class TestForwardStrandMatching:
 
         fasta_content = f">NZ_CP010115.1\n{real_sequence}\n"
 
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.sts', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".sts", delete=False) as f:
             f.write(sts_content)
             sts_file = f.name
 
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.fa', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".fa", delete=False) as f:
             f.write(fasta_content)
             fasta_file = f.name
 
@@ -206,12 +206,10 @@ class TestForwardStrandMatching:
             forward_hits = 0
 
             from merpcr.core.models import ThreadData
+
             for record in records:
                 thread_data = ThreadData(
-                    thread_id=0,
-                    sequence=record.sequence,
-                    offset=0,
-                    length=len(record.sequence)
+                    thread_id=0, sequence=record.sequence, offset=0, length=len(record.sequence)
                 )
                 engine._process_thread(thread_data)
 
@@ -242,8 +240,7 @@ class TestForwardStrandMatching:
 
         for forward, expected_rc in test_cases:
             rc = engine._reverse_complement(forward)
-            assert rc == expected_rc, \
-                f"RC of {forward} should be {expected_rc}, got {rc}"
+            assert rc == expected_rc, f"RC of {forward} should be {expected_rc}, got {rc}"
 
     def test_compare_seqs_with_strand_parameter(self):
         """Test sequence comparison with correct strand parameter."""
@@ -257,8 +254,9 @@ class TestForwardStrandMatching:
         # Test with mismatch in 3' region (should fail)
         seq1 = "ACGTACGT"
         seq2 = "ACGTACGA"  # Mismatch at end (3' for +)
-        assert not engine._compare_seqs(seq1, seq2, "+"), \
-            "Should not match with 3' mismatch on forward strand"
+        assert not engine._compare_seqs(
+            seq1, seq2, "+"
+        ), "Should not match with 3' mismatch on forward strand"
 
         # Test reverse strand comparison (strand="-")
         seq1 = "ACGTACGT"
@@ -268,8 +266,9 @@ class TestForwardStrandMatching:
         # Test with mismatch in 3' region for reverse (should fail)
         seq1 = "ACGTACGT"
         seq2 = "GCGTACGT"  # Mismatch at start (3' for -)
-        assert not engine._compare_seqs(seq1, seq2, "-"), \
-            "Should not match with 3' mismatch on reverse strand"
+        assert not engine._compare_seqs(
+            seq1, seq2, "-"
+        ), "Should not match with 3' mismatch on reverse strand"
 
 
 class TestForwardStrandRegressions:
@@ -290,11 +289,11 @@ class TestForwardStrandRegressions:
             "NNNNNNNNNACGTACGTACGT\n"
         )
 
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.sts', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".sts", delete=False) as f:
             f.write(sts_content)
             sts_file = f.name
 
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.fa', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".fa", delete=False) as f:
             f.write(fasta_content)
             fasta_file = f.name
 
@@ -303,13 +302,11 @@ class TestForwardStrandRegressions:
             records = engine.load_fasta_file(fasta_file)
 
             from merpcr.core.models import ThreadData
+
             hits = []
             for record in records:
                 thread_data = ThreadData(
-                    thread_id=0,
-                    sequence=record.sequence,
-                    offset=0,
-                    length=len(record.sequence)
+                    thread_id=0, sequence=record.sequence, offset=0, length=len(record.sequence)
                 )
                 engine._process_thread(thread_data)
                 hits.extend(thread_data.hits)
@@ -331,11 +328,11 @@ class TestForwardStrandRegressions:
         # Sequence with no valid hits
         fasta_content = ">test_seq\nTTTTTTTTTTTTTTTTTTTTTTTTTTTT\n"
 
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.sts', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".sts", delete=False) as f:
             f.write(sts_content)
             sts_file = f.name
 
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.fa', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".fa", delete=False) as f:
             f.write(fasta_content)
             fasta_file = f.name
 
@@ -344,13 +341,11 @@ class TestForwardStrandRegressions:
             records = engine.load_fasta_file(fasta_file)
 
             from merpcr.core.models import ThreadData
+
             hits = []
             for record in records:
                 thread_data = ThreadData(
-                    thread_id=0,
-                    sequence=record.sequence,
-                    offset=0,
-                    length=len(record.sequence)
+                    thread_id=0, sequence=record.sequence, offset=0, length=len(record.sequence)
                 )
                 engine._process_thread(thread_data)
                 hits.extend(thread_data.hits)

@@ -259,8 +259,7 @@ class TestPropertyBasedCLI:
     @settings(max_examples=20)
     def test_parameter_types_bounds(self, value):
         """Test parameter type functions with various values."""
-        from merpcr.cli import (margin_type, mismatch_type, threads_type,
-                                wordsize_type)
+        from merpcr.cli import margin_type, mismatch_type, threads_type, wordsize_type
 
         # Test margin_type
         try:

@@ -66,7 +66,7 @@ body:
       description: Information about your environment
       placeholder: |
         - merPCR version: [e.g., 1.0.0]
-        - Python version: [e.g., 3.11.0]
+        - Python version: [e.g., 3.13.0]
         - Operating System: [e.g., Ubuntu 22.04, macOS 13.0, Windows 11]
         - Installation method: [e.g., pip install, git clone]
     validations:

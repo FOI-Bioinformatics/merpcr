@@ -477,11 +477,11 @@ class TestRecoveryMechanisms:
     def test_partial_failure_recovery(self):
         """Test recovery from partial failures."""
         # Create mixed good and bad STS entries
-        mixed_sts = """GOOD1\tATCG\tCGAT\t50
-BAD_ENTRY_WITH_INVALID_SIZE\tATCG\tCGAT\tNOT_A_NUMBER
-GOOD2\tTACG\tGTCA\t60
-\tEMPTY_ID\tCGAT\t70
-GOOD3\tGCTA\tTAGC\t80"""
+        mixed_sts = """GOOD1\tATCGATCGATCG\tCGATCGATCGAT\t50
+BAD_ENTRY_WITH_INVALID_SIZE\tATCGATCGATCG\tCGATCGATCGAT\tNOT_A_NUMBER
+GOOD2\tTACGTACGTACG\tGTCAGTCAGTCA\t60
+\tEMPTY_ID\tCGATCGATCGAT\t70
+GOOD3\tGCTAGCTAGCTA\tTAGCTAGCTAGC\t80"""
 
         with tempfile.NamedTemporaryFile(mode="w", suffix=".sts", delete=False) as f:
             f.write(mixed_sts)

@@ -46,7 +46,7 @@ class TestSTSRecord(unittest.TestCase):
         """Test STS record with default values."""
         sts = STSRecord(id="TEST002", primer1="GGCCTTAA", primer2="TTAAGGCC", pcr_size=200)
 
-        self.assertEqual(sts.alias, "")
+        self.assertIsNone(sts.alias)
         self.assertEqual(sts.offset, 0)
         self.assertEqual(sts.hash_offset, 0)
         self.assertEqual(sts.direct, "+")

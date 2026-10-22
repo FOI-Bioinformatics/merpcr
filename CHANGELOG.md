@@ -2,6 +2,54 @@
 
 This document records significant modifications and enhancements to the merPCR software package following semantic versioning principles.
 
+## [1.0.1] - Audit against me-PCR 1.0.6
+
+Every behavior below was checked by running the me-PCR 1.0.6 binary on the same
+input. A differential test harness (scripts/compare_with_mepcr.py) and the
+regression tests in tests/test_mepcr_fidelity.py document the corrections.
+
+### Corrections for me-PCR compatibility
+- Output: the alias column is omitted when the STS line has no fifth field, and
+  text after the fourth tab is reported verbatim (including further tabs).
+- FASTA parsing: uses the me-PCR nucleotide alphabet. X and U are dropped from
+  sequences; the gap character "-" is kept and counts as a position.
+- IUPAC mode: matching is one-directional, as in me-PCR. A primer code matches
+  the sequence bases it expands to, but an ambiguity code in the sequence does
+  not match a plain primer base. Only primers containing ambiguity codes are
+  compared this way.
+- Hashing: U is treated as ambiguous when choosing the hash word.
+- Hit order: hits are reported in scan order, chunk by chunk, with records that
+  share a hash value checked most-recent-first, instead of being sorted by
+  start position.
+- Threading: duplicate hits in chunk overlaps were not removed because
+  absolute positions were compared with a chunk-relative limit. Chunk sizes now
+  use the same rounding as me-PCR and the threading decision uses the FASTA
+  file size.
+- STS parsing: lines longer than the -S limit are an error; an STS whose first
+  primer has no hash is skipped entirely; the secondary loader in
+  merpcr.io.sts and merpcr.core.utils.hash_value now share the engine logic.
+- A defline consisting only of ">" gives an empty label instead of an error.
+- The legacy "-margin N" option of me-PCR is accepted.
+
+### Tests and documentation
+- New regression tests (tests/test_mepcr_fidelity.py) and a differential test
+  harness against the me-PCR binary (scripts/compare_with_mepcr.py).
+- The threading performance test no longer asserts on wall-clock time, and the
+  memory test uses a random sequence instead of a periodic one that matched
+  every marker at every position.
+- Documentation consolidated into README.md and five files under docs/.
+  CI reduced to a test/lint/build workflow and a release workflow.
+
+### Requirements
+- Python 3.13 or later is required. Formatting and import order are now
+  enforced in CI with black and isort.
+
+### Deliberate differences from me-PCR 1.0.6
+- PCR size ranges ("200-220") and "-" are accepted as described in the me-PCR
+  source; the 1.0.6 binary rejects them with a format error.
+- STS lines following a comment line are reported correctly; me-PCR 1.0.6
+  reads the wrong line when reporting such hits.
+
 ## [1.0.0] - Production Release
 
 ### Implementation Enhancements

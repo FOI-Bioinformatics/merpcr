@@ -4,12 +4,18 @@ FASTA file loading functionality.
 
 import logging
 import os
+import re
 import time
 from typing import List
 
 from ..core.models import FASTARecord
 
 logger = logging.getLogger(__name__)
+
+# Characters kept from the sequence lines, as in me-PCR (fasta-io.cpp, chrValidNt).
+# Note that X and U are dropped while the gap character "-" is kept.
+VALID_NT_CHARS = "GATCNBDHKMRSVWY-"
+_INVALID_NT_RE = re.compile("[^" + VALID_NT_CHARS + "]")
 
 
 class FASTALoader:
@@ -56,9 +62,8 @@ class FASTALoader:
                     current_defline = line
                     current_sequence = []
                 else:
-                    # Add to current sequence, keeping only valid nucleotide characters
-                    filtered_line = "".join(c for c in line if c.upper() in "ACGTBDHKMNRSVWXY")
-                    current_sequence.append(filtered_line)
+                    # Upper-case and keep only the characters me-PCR keeps
+                    current_sequence.append(_INVALID_NT_RE.sub("", line.upper()))
 
         # Don't forget the last sequence
         if current_defline is not None:

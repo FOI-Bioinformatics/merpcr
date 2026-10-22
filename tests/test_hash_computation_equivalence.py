@@ -12,6 +12,7 @@ Key algorithm from me-PCR (stsmatch.cpp lines 1204-1240):
 """
 
 import pytest
+
 from merpcr.core.engine import MerPCR
 
 
@@ -80,7 +81,7 @@ class TestHashComputationEquivalence:
         primer = "TTTTTTTTTTT"
         offset, hash_value = engine11._hash_value(primer)
         # All T's = all 3's = 0b11111111111111111111 = (4^11 - 1) = 4194303
-        expected = (4**11 - 1)
+        expected = 4**11 - 1
         assert hash_value == expected, f"Expected hash={expected} for all T's, got {hash_value}"
 
         # Test "ACGT" repeated pattern (wordsize 11)

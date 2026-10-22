@@ -96,8 +96,8 @@ WXYZ789GCTA
         records = FASTALoader.load_file(temp_file)
 
         self.assertEqual(len(records), 1)
-        # Should keep valid nucleotides including ambiguity codes
-        self.assertEqual(records[0].sequence, "ATCGNNNNATCGWXYGCTA")
+        # Keeps the me-PCR nucleotide alphabet; X is dropped like other characters
+        self.assertEqual(records[0].sequence, "ATCGNNNNATCGWYGCTA")
 
     def test_empty_file(self):
         """Test loading empty file."""
@@ -205,7 +205,7 @@ class TestSTSLoader(unittest.TestCase):
         content = "INVALID\tONLY_TWO_FIELDS\n"
         temp_file = self.create_temp_sts(content)
 
-        with self.assertLogs(level="ERROR") as cm:
+        with self.assertLogs("merpcr.core.engine", level="ERROR") as cm:
             success = self.mer_pcr.load_sts_file(temp_file)
 
         self.assertFalse(success)

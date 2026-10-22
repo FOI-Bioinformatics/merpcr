@@ -4,7 +4,7 @@ Data models for merPCR.
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import List
+from typing import List, Optional
 
 
 class SeqType(Enum):
@@ -22,7 +22,9 @@ class STSRecord:
     primer1: str
     primer2: str
     pcr_size: int
-    alias: str = ""
+    # Text following the fourth tab of the STS line. None means the line had no
+    # alias field at all, which me-PCR reports differently from an empty alias.
+    alias: Optional[str] = None
     offset: int = 0  # Line number in the original file
     hash_offset: int = 0  # Offset of hash word within primer
     direct: str = "+"  # Orientation: '+' for forward, '-' for reverse
@@ -41,13 +43,11 @@ class FASTARecord:
     def __post_init__(self):
         """Extract the label from the defline if not provided."""
         if not self.label:
-            if ">" in self.defline:
-                defline = self.defline.strip()[1:]  # Remove '>' character
-            else:
-                defline = self.defline.strip()
-
-            # Extract label as the first word in the defline
-            self.label = defline.split()[0]
+            # Follow me-PCR: skip the leading '>' and blanks, then take the text up to
+            # the first space or tab. A defline with no text gives an empty label.
+            defline = self.defline.lstrip(" \t").lstrip(">").lstrip(" \t")
+            words = defline.split(None, 1)
+            self.label = words[0] if words else ""
 
 
 @dataclass
