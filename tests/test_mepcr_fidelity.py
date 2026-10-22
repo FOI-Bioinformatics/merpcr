@@ -242,3 +242,34 @@ class TestCli:
             "-M",
             "5",
         ]
+
+
+class TestFindHits:
+    def test_find_hits_returns_structured_results(self, tmpdir_path):
+        sts = write(os.path.join(tmpdir_path, "f.sts"), f"S1\t{P1}\t{P2}\t200\tAL\n")
+        fa = write(os.path.join(tmpdir_path, "f.fa"), ">seq1 desc\n" + planted_sequence() + "\n")
+        engine = MerPCR()
+        assert engine.load_sts_file(sts)
+        hits = engine.find_hits(engine.load_fasta_file(fa))
+        assert len(hits) == 1
+        hit = hits[0]
+        assert (hit.seq_label, hit.start, hit.end) == ("seq1", 101, 300)
+        assert hit.sts_id == "S1" and hit.alias == "AL" and hit.strand == "+"
+        assert hit.size == 200
+        assert hit.format() == "seq1\t101..300\tS1\tAL\t(+)"
+        assert engine.hits == hits
+
+    def test_search_output_matches_find_hits(self, tmpdir_path):
+        sts = write(
+            os.path.join(tmpdir_path, "f.sts"), f"S1\t{P1}\t{P2}\t200\nS2\t{P2}\t{P1}\t200\n"
+        )
+        fa = write(os.path.join(tmpdir_path, "f.fa"), ">seq1\n" + planted_sequence() + "\n")
+        engine = MerPCR()
+        engine.load_sts_file(sts)
+        records = engine.load_fasta_file(fa)
+        out = os.path.join(tmpdir_path, "out.txt")
+        count = engine.search(records, output_file=out)
+        with open(out) as fh:
+            lines = fh.read().splitlines()
+        assert count == len(lines) == len(engine.hits)
+        assert lines == [h.format() for h in engine.find_hits(records)]

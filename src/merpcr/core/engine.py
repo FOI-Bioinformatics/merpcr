@@ -15,7 +15,7 @@ from typing import Dict, List, Optional
 import numpy as np
 
 from ..io.fasta import FASTALoader
-from .models import FASTARecord, STSHit, STSRecord, ThreadData
+from .models import FASTARecord, SearchHit, STSHit, STSRecord, ThreadData
 
 # Try to import Cython-optimized functions
 try:
@@ -88,6 +88,7 @@ class MerPCR:
         self.sts_table = {}  # Hash table for STS lookup
         self.max_pcr_size = 0
         self.total_hits = 0
+        self.hits: List[SearchHit] = []  # Results of the last find_hits/search call
         # Size of the last FASTA file loaded; me-PCR uses it to decide on threading
         self._fasta_file_size: Optional[int] = None
 
@@ -488,19 +489,38 @@ class MerPCR:
 
     def search(self, fasta_records: List[FASTARecord], output_file: str = None) -> int:
         """
+        Search for STS markers and write one output line per hit.
+
+        Lines go to output_file, or to standard output when it is None or
+        "stdout". Returns the number of hits. The hits themselves are
+        available from find_hits() and, after this call, in self.hits.
+        """
+        hits = self.find_hits(fasta_records)
+
+        if output_file and output_file.lower() != "stdout":
+            with open(output_file, "w") as output:
+                for hit in hits:
+                    print(hit.format(), file=output)
+        else:
+            for hit in hits:
+                print(hit.format(), file=sys.stdout)
+
+        logger.info(f"Total hits found: {len(hits)}")
+        self.total_hits = len(hits)
+        return len(hits)
+
+    def find_hits(self, fasta_records: List[FASTARecord]) -> List[SearchHit]:
+        """
         Search for STS markers in the provided FASTA sequences.
 
         Work is split into overlapping chunks exactly as me-PCR does
-        (stsmatch.cpp, ProcessSeq and ReportHits), and hits are reported in
-        the same order: chunk by chunk, in the order the scan finds them.
-        Hits lying in the leading overlap of a chunk other than the first
-        are duplicates of the previous chunk and are dropped.
+        (stsmatch.cpp, ProcessSeq and ReportHits), and hits are returned in
+        the same order: sequence by sequence, chunk by chunk, in the order
+        the scan finds them. Hits lying in the leading overlap of a chunk
+        other than the first are duplicates of the previous chunk and are
+        dropped. Positions in the returned SearchHit objects are 1-based.
         """
-        total_hits = 0
-        if output_file and output_file.lower() != "stdout":
-            output = open(output_file, "w")
-        else:
-            output = sys.stdout
+        results: List[SearchHit] = []
 
         # me-PCR decides on threading from the size of the sequence file
         if self._fasta_file_size is not None:
@@ -575,24 +595,11 @@ class MerPCR:
                         continue
                     hits.append(hit)
 
-            # Report hits
             for hit in hits:
-                sts = hit.sts
-                pos1 = hit.pos1 + 1  # Convert to 1-based
-                pos2 = hit.pos2 + 1  # Convert to 1-based
+                results.append(SearchHit(seq_label, hit.pos1 + 1, hit.pos2 + 1, hit.sts))
 
-                # me-PCR prints the alias field only when the STS line had one
-                alias_field = "" if sts.alias is None else f"\t{sts.alias}"
-                output_line = f"{seq_label}\t{pos1}..{pos2}\t{sts.id}{alias_field}\t({sts.direct})"
-                print(output_line, file=output)
-                total_hits += 1
-
-        if output_file and output_file.lower() != "stdout":
-            output.close()
-
-        logger.info(f"Total hits found: {total_hits}")
-        self.total_hits = total_hits
-        return total_hits
+        self.hits = results
+        return results
 
     def _process_thread(self, thread_data: ThreadData) -> ThreadData:
         """Process a single thread's worth of sequence data."""

@@ -2,6 +2,13 @@
 
 This document records significant modifications and enhancements to the merPCR software package following semantic versioning principles.
 
+## [1.0.2] - Structured results from the Python API
+
+- New `MerPCR.find_hits(records)` returns the hits as `SearchHit` objects
+  (sequence label, 1-based start and end, STS record, strand, product size,
+  and `format()` for the output line). `search()` now calls it and writes the
+  lines; the last results are kept in `MerPCR.hits`.
+
 ## [1.0.1] - Audit against me-PCR 1.0.6
 
 Every behavior below was checked by running the me-PCR 1.0.6 binary on the same

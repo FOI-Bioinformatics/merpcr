@@ -7,6 +7,7 @@ import logging
 import sys
 from typing import List
 
+from . import __version__
 from .core.engine import (
     DEFAULT_IUPAC_MODE,
     DEFAULT_MARGIN,
@@ -217,7 +218,9 @@ def create_parser() -> argparse.ArgumentParser:
         help=f"Max. line length for the STS file (default: {DEFAULT_MAX_STS_LINE_LENGTH})",
     )
 
-    parser.add_argument("-v", "--version", action="version", version="merPCR version 1.0.0")
+    parser.add_argument(
+        "-v", "--version", action="version", version=f"merPCR version {__version__}"
+    )
 
     parser.add_argument("--debug", action="store_true", help="Enable debug logging")
 
