@@ -1,7 +1,5 @@
 <div align="center">
-  <img src="assets/images/merPCR_logo.png" alt="merPCR logo" width="300">
-
-  # merPCR
+  <img src="assets/images/merPCR_logo.png" alt="merPCR: modern electronic PCR implementation" width="600">
 
   [![CI](https://github.com/FOI-Bioinformatics/merpcr/actions/workflows/ci.yml/badge.svg)](https://github.com/FOI-Bioinformatics/merpcr/actions/workflows/ci.yml)
   [![Python 3.13+](https://img.shields.io/badge/python-3.13+-blue.svg)](https://www.python.org/downloads/)
