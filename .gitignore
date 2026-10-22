@@ -299,3 +299,5 @@ site/
 # Performance profiling
 *.perf
 performance_results/
+.benchmarks/
+scratch/

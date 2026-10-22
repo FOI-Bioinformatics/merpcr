@@ -12,11 +12,13 @@ src/merpcr/
   io/fasta.py         FASTA reader
   io/sts.py           STSLoader wrapper around the engine's parser
 tests/                pytest suite; tests/data holds the me-PCR test files
-scripts/compare_with_mepcr.py   differential test against the me-PCR binary
+scripts/              comparison and benchmark scripts (see below)
 docs/                 this documentation
 ```
 
-`test_compatibility.py`, `validate_real_data.py` and `benchmark_cython.py` in the repository root compare against a local me-PCR build and local genome data; their paths need to be edited before use.
+`scripts/compare_with_mepcr.py` is the differential test against a me-PCR binary and takes the binary path as an argument. `scripts/test_compatibility.py`, `scripts/validate_real_data.py` and `scripts/benchmark_cython.py` compare against a local me-PCR build and local genome data; their paths are hard-coded and need to be edited before use.
+
+Tool configuration (pytest, coverage, black, isort, mypy) lives in `pyproject.toml`; `tox.ini` holds the tox environments and the flake8 settings.
 
 ## Setup
 

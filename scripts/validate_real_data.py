@@ -9,7 +9,7 @@ This script:
 4. Does NOT commit any real data to the repository
 
 Usage:
-    python validate_real_data.py [--quick]  # --quick runs only default config
+    python scripts/validate_real_data.py [--quick]  # --quick runs only default config
 """
 
 import argparse

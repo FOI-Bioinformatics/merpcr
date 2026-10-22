@@ -4,6 +4,11 @@ This document records significant modifications and enhancements to the merPCR s
 
 ## [1.0.2] - Structured results from the Python API
 
+- Repository layout: ad-hoc comparison and benchmark scripts moved from the
+  root to scripts/; the redundant scripts/merpcr launcher removed (use the
+  installed merpcr command or python -m merpcr); pytest and coverage
+  configuration moved into pyproject.toml; make clean removes all local
+  artifacts.
 - New `MerPCR.find_hits(records)` returns the hits as `SearchHit` objects
   (sequence label, 1-based start and end, STS record, strand, product size,
   and `format()` for the output line). `search()` now calls it and writes the
