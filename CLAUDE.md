@@ -4,7 +4,7 @@ This file provides comprehensive guidance to Claude Code (claude.ai/code) when w
 
 ## System Status: PRODUCTION READY ✅
 
-- **Version**: 1.0.4
+- **Version**: 1.0.5
 - **Test Coverage**: **94% for engine.py** (critical component), comprehensive edge case testing
 - **Test Suite**: 277 comprehensive tests across 19 test files
 - **Architecture**: Modular, typed, thread-safe

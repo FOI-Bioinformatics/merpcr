@@ -2,6 +2,14 @@
 
 This document records significant modifications and enhancements to the merPCR software package following semantic versioning principles.
 
+## [1.0.5] - Mismatch counts on hits
+
+- `SearchHit` gains `mismatches1`, `mismatches2` (and the sum `mismatches`)
+  together with the matched sequence windows `seq1` and `seq2`. The counts
+  are computed after the search for reported hits only, with the same
+  comparison rule the search used, so the scan and the text output are
+  unchanged.
+
 ## [1.0.4] - Compressed input files
 
 - STS and FASTA files ending in .gz, .bz2, .xz or .lzma are decompressed
