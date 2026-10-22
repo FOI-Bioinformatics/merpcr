@@ -6,6 +6,7 @@ This module contains the main MerPCR class that handles STS searching functional
 
 import concurrent.futures
 import logging
+import math
 import os
 import sys
 import time
@@ -31,6 +32,9 @@ except ImportError:
 # Constants
 AMBIG = 100
 MIN_FILESIZE_FOR_THREADING = 100000
+# Flags recording which primer of an STS record contains IUPAC ambiguity codes
+PRIMER1 = 1
+PRIMER2 = 2
 
 # Default parameters
 DEFAULT_MARGIN = 50
@@ -84,6 +88,8 @@ class MerPCR:
         self.sts_table = {}  # Hash table for STS lookup
         self.max_pcr_size = 0
         self.total_hits = 0
+        # Size of the last FASTA file loaded; me-PCR uses it to decide on threading
+        self._fasta_file_size: Optional[int] = None
 
         # Initialize lookup tables
         self._init_lookup_tables()
@@ -121,7 +127,7 @@ class MerPCR:
         self.scode[ord("C")] = self.scode[ord("c")] = 1
         self.scode[ord("G")] = self.scode[ord("g")] = 2
         self.scode[ord("T")] = self.scode[ord("t")] = 3
-        self.scode[ord("U")] = self.scode[ord("u")] = 3  # Treat U (RNA) as T
+        # As in me-PCR, U is not hashable and is treated as an ambiguous base
 
         # Complement table for reverse complement
         self.compl = {}
@@ -186,23 +192,18 @@ class MerPCR:
             "n": "ACGTURYMKSWBDHVN",
         }
 
-        # Initialize IUPAC match matrix if IUPAC mode is enabled
-        # Use NumPy array for faster lookup (Phase 2.2 optimization)
+        # IUPAC match matrix indexed as [sequence_base, primer_base]. This follows
+        # me-PCR (stsmatch.cpp, init_IUPAC_match_matrix): a primer base matches the
+        # sequence bases it expands to, but an ambiguity code in the sequence does
+        # not match a plain primer base. The matrix is always allocated because the
+        # Cython extension expects it; it is only consulted in IUPAC mode.
+        self.iupac_match_matrix = np.zeros((256, 256), dtype=np.uint8)
         if self.iupac_mode:
-            self.iupac_match_matrix = np.zeros((256, 256), dtype=np.uint8)
-            for base1, matches1 in self.iupac_mapping.items():
-                for base2, matches2 in self.iupac_mapping.items():
-                    # Two bases match if their possible interpretations overlap
-                    set1 = set(matches1.upper())
-                    set2 = set(matches2.upper())
-                    if set1.intersection(set2):
-                        self.iupac_match_matrix[ord(base1), ord(base2)] = 1
-                        # Also add the uppercase-lowercase combinations
-                        self.iupac_match_matrix[ord(base1.upper()), ord(base2.lower())] = 1
-                        self.iupac_match_matrix[ord(base1.lower()), ord(base2.upper())] = 1
-        else:
-            # Create empty matrix for non-IUPAC mode (required by Cython function)
-            self.iupac_match_matrix = np.zeros((256, 256), dtype=np.uint8)
+            for primer_base, matches in self.iupac_mapping.items():
+                for seq_base in matches:
+                    for pb in (primer_base.upper(), primer_base.lower()):
+                        for sb in (seq_base.upper(), seq_base.lower()):
+                            self.iupac_match_matrix[ord(sb), ord(pb)] = 1
 
         # Ambiguity detection lookup
         self.ambig = {}
@@ -210,7 +211,21 @@ class MerPCR:
             self.ambig[base] = True
 
     def load_sts_file(self, filename: str) -> bool:
-        """Load STS records from a tab-delimited file."""
+        """
+        Load STS records from a tab-delimited file.
+
+        The parsing rules follow me-PCR (stsmatch.cpp, ReadStsFile):
+        - fields are id, primer1, primer2, size and an optional alias text;
+          everything after the fourth tab is kept verbatim as the alias
+        - lines longer than max_sts_line_length are an error
+        - an STS whose first primer cannot be hashed is skipped entirely
+        - records sharing a hash value are kept most-recent-first
+
+        Two deliberate differences from me-PCR 1.0.6 are kept: size ranges
+        ("200-220") and "-" are accepted as documented in the me-PCR source,
+        although that release rejects them, and comment lines do not disturb
+        the reporting of the STS that follows them.
+        """
         start_time = time.time()
         file_size = os.path.getsize(filename)
 
@@ -229,15 +244,18 @@ class MerPCR:
         bad_pcr_size = 0
 
         with open(filename, "r") as file:
-            lines = file.readlines()
-            line_no = 0
+            for line_no, raw_line in enumerate(file.readlines(), start=1):
+                line = raw_line.rstrip("\r\n")
 
-            for line in lines:
-                line_no += 1
-                line = line.strip()
+                if len(line) > self.max_sts_line_length:
+                    logger.error(
+                        f"STS file line {line_no} exceeds the maximum line length of "
+                        f"{self.max_sts_line_length} characters (raise it with -S)"
+                    )
+                    return False
 
                 # Skip comments and blank lines
-                if not line or line.startswith("#"):
+                if not line.strip() or line.startswith("#"):
                     continue
 
                 # Parse tab-delimited fields
@@ -254,59 +272,80 @@ class MerPCR:
 
                 # Parse PCR size and get margin adjustment for ranges
                 pcr_size, margin_adjustment = self._parse_pcr_size(fields[3])
-                alias = fields[4] if len(fields) > 4 else ""
 
-                # Calculate margin to use for this STS (base margin + adjustment for ranges)
+                # me-PCR reports the whole remainder of the line after the size field
+                alias = "\t".join(fields[4:]) if len(fields) > 4 else None
+
+                # Margin to use for this STS (base margin + adjustment for ranges)
                 margin_to_use = self.margin + margin_adjustment
-
-                # Check if primer length and PCR size are valid
-                if len(primer1) < self.wordsize or len(primer2) < self.wordsize:
-                    bad_primers_short += 1
-                    continue
 
                 if len(primer1) + len(primer2) > pcr_size:
                     bad_pcr_size += 1
                     pcr_size = len(primer1) + len(primer2)
 
+                if len(primer1) < self.wordsize or len(primer2) < self.wordsize:
+                    bad_primers_short += 1
+                    continue
+
                 # Keep track of the maximum PCR size
                 if pcr_size > self.max_pcr_size:
                     self.max_pcr_size = pcr_size
 
-                # Create STS record for forward direction
-                # For forward hits: search for primer1 (forward) followed by primer2_rc
-                # For reverse hits: search for primer2 (forward) followed by primer1_rc
+                # Record which primers carry IUPAC codes (only relevant in IUPAC mode)
+                ambig_for = 0
+                ambig_rev = 0
+                if self.iupac_mode:
+                    if any(base in self.ambig for base in primer1):
+                        ambig_for |= PRIMER1
+                        ambig_rev |= PRIMER2
+                    if any(base in self.ambig for base in primer2):
+                        ambig_for |= PRIMER2
+                        ambig_rev |= PRIMER1
+
+                # For forward hits: search for primer1 followed by the reverse
+                # complement of primer2. For reverse hits: search for primer2
+                # followed by the reverse complement of primer1.
                 rev_primer1 = self._reverse_complement(primer1)
                 rev_primer2 = self._reverse_complement(primer2)
 
-                sts = STSRecord(
+                hash_offset1, hash_value1 = self._hash_value(primer1)
+                if hash_offset1 < 0:
+                    # me-PCR drops the whole STS when the first primer has no hash
+                    bad_primers_ambig += 1
+                    continue
+
+                sts_for = STSRecord(
                     id=sts_id,
                     primer1=primer1,
-                    primer2=primer2,
+                    primer2=rev_primer2,
                     pcr_size=pcr_size,
                     alias=alias,
                     offset=line_no,
+                    hash_offset=hash_offset1,
                     direct="+",
+                    ambig_primer=ambig_for,
                     margin=margin_to_use,
                 )
+                self._insert_sts(sts_for, hash_value1)
 
-                # Forward primer hash: search for primer1 followed by primer2_rc
-                hash_offset1, hash_value1 = self._hash_value(primer1)
-                if hash_offset1 >= 0:
-                    sts_for = STSRecord(**{**vars(sts), "hash_offset": hash_offset1, "direct": "+"})
-                    sts_for.primer2 = rev_primer2  # Store reverse complement for forward direction
-                    self._insert_sts(sts_for, hash_value1)
-                else:
-                    bad_primers_ambig += 1
-
-                # Reverse direction: search for primer2 (forward) followed by primer1_rc
                 hash_offset2, hash_value2 = self._hash_value(primer2)
-                if hash_offset2 >= 0:
-                    sts_rev = STSRecord(**{**vars(sts), "hash_offset": hash_offset2, "direct": "-"})
-                    sts_rev.primer1 = primer2
-                    sts_rev.primer2 = rev_primer1
-                    self._insert_sts(sts_rev, hash_value2)
-                else:
+                if hash_offset2 < 0:
                     bad_primers_ambig += 1
+                    continue
+
+                sts_rev = STSRecord(
+                    id=sts_id,
+                    primer1=primer2,
+                    primer2=rev_primer1,
+                    pcr_size=pcr_size,
+                    alias=alias,
+                    offset=line_no,
+                    hash_offset=hash_offset2,
+                    direct="-",
+                    ambig_primer=ambig_rev,
+                    margin=margin_to_use,
+                )
+                self._insert_sts(sts_rev, hash_value2)
 
         # Report statistics
         if bad_primers_short > 0:
@@ -374,9 +413,11 @@ class MerPCR:
 
     def _insert_sts(self, sts: STSRecord, hash_value: int):
         """Insert an STS record into the hash table."""
+        # me-PCR prepends to a linked list, so later records are checked first.
+        # The order matters because hits are reported in the order they are found.
         if hash_value not in self.sts_table:
             self.sts_table[hash_value] = []
-        self.sts_table[hash_value].append(sts)
+        self.sts_table[hash_value].insert(0, sts)
         self.sts_records.append(sts)
 
     def _hash_value(self, primer: str) -> tuple[int, int]:
@@ -413,8 +454,8 @@ class MerPCR:
 
             # Try to compute hash from this offset
             while i < self.wordsize:
-                base = primer[offset + i]
-                code = int(self.scode[ord(base)])  # Convert numpy type to int
+                char_code = ord(primer[offset + i])
+                code = int(self.scode[char_code]) if char_code < 256 else AMBIG
 
                 if code == AMBIG:
                     # Found ambiguity at position i within the word
@@ -442,15 +483,34 @@ class MerPCR:
 
     def load_fasta_file(self, filename: str) -> List[FASTARecord]:
         """Load sequences from a FASTA file."""
+        self._fasta_file_size = os.path.getsize(filename)
         return FASTALoader.load_file(filename)
 
     def search(self, fasta_records: List[FASTARecord], output_file: str = None) -> int:
-        """Search for STS markers in the provided FASTA sequences."""
+        """
+        Search for STS markers in the provided FASTA sequences.
+
+        Work is split into overlapping chunks exactly as me-PCR does
+        (stsmatch.cpp, ProcessSeq and ReportHits), and hits are reported in
+        the same order: chunk by chunk, in the order the scan finds them.
+        Hits lying in the leading overlap of a chunk other than the first
+        are duplicates of the previous chunk and are dropped.
+        """
         total_hits = 0
         if output_file and output_file.lower() != "stdout":
             output = open(output_file, "w")
         else:
             output = sys.stdout
+
+        # me-PCR decides on threading from the size of the sequence file
+        if self._fasta_file_size is not None:
+            fasta_size = self._fasta_file_size
+        else:
+            fasta_size = sum(len(record.sequence) for record in fasta_records)
+        base_threads = self.threads
+        if fasta_size < MIN_FILESIZE_FOR_THREADING and base_threads > 1:
+            logger.info("Sequence file too small for threading, using single thread.")
+            base_threads = 1
 
         for record in fasta_records:
             seq_label = record.label
@@ -459,22 +519,25 @@ class MerPCR:
 
             logger.info(f"Processing sequence: {seq_label} ({seq_len} bp)")
 
-            # Determine number of threads to use
-            num_threads = self.threads
-            if seq_len < MIN_FILESIZE_FOR_THREADING:
-                logger.info("Sequence too small for threading, using single thread.")
-                num_threads = 1
+            num_threads = base_threads
 
-            # Calculate overlap size
+            # Minimum overlap between chunks so that no STS is missed
             overlap = self.max_pcr_size + self.margin - 1
+            if overlap < 0:
+                num_threads = 1
 
             # Ensure we don't use too many threads
             while num_threads > 1 and (num_threads + 1) * overlap > seq_len:
                 num_threads -= 1
                 logger.info(f"Reduced threads to {num_threads} due to sequence size limitations")
 
-            # Calculate chunk size for each thread
-            chunk_size = int((seq_len - (num_threads + 1) * overlap) / num_threads) + 2 * overlap
+            # Chunk size for each thread (ceil, as in me-PCR)
+            if num_threads > 1:
+                chunk_size = (
+                    math.ceil((seq_len - (num_threads + 1) * overlap) / num_threads) + 2 * overlap
+                )
+            else:
+                chunk_size = seq_len
 
             # Prepare thread data
             thread_data = []
@@ -503,17 +566,14 @@ class MerPCR:
                 # Single thread version
                 thread_data[0] = self._process_thread(thread_data[0])
 
-            # Process results, filtering redundant hits
+            # Collect hits in chunk order, dropping duplicates from the overlap.
+            # Positions in hits are absolute, so compare relative to the chunk start.
             hits = []
             for i, data in enumerate(thread_data):
                 for hit in data.hits:
-                    # Skip redundant hits (those that appear in the overlap region)
-                    if data.offset > 0 and hit.pos2 < overlap and i > 0:
+                    if i > 0 and (hit.pos2 - data.offset) < overlap:
                         continue
                     hits.append(hit)
-
-            # Sort hits by position
-            hits.sort(key=lambda h: h.pos1)
 
             # Report hits
             for hit in hits:
@@ -521,7 +581,9 @@ class MerPCR:
                 pos1 = hit.pos1 + 1  # Convert to 1-based
                 pos2 = hit.pos2 + 1  # Convert to 1-based
 
-                output_line = f"{seq_label}\t{pos1}..{pos2}\t{sts.id}\t{sts.alias}\t({sts.direct})"
+                # me-PCR prints the alias field only when the STS line had one
+                alias_field = "" if sts.alias is None else f"\t{sts.alias}"
+                output_line = f"{seq_label}\t{pos1}..{pos2}\t{sts.id}{alias_field}\t({sts.direct})"
                 print(output_line, file=output)
                 total_hits += 1
 
@@ -591,7 +653,9 @@ class MerPCR:
                 h = (h << 2) & ((1 << (2 * self.wordsize)) - 1)
 
                 # Add new rightmost base to hash
-                code = int(self.scode[ord(sequence[pos + self.wordsize])])  # Convert numpy type to int
+                code = int(
+                    self.scode[ord(sequence[pos + self.wordsize])]
+                )  # Convert numpy type to int
                 if code == AMBIG:
                     N = self.wordsize
                 else:
@@ -608,8 +672,14 @@ class MerPCR:
         primer1 = sts.primer1
         len_p1 = len(primer1)
 
+        # me-PCR only interprets IUPAC codes for primers that contain them
+        iupac_p1 = bool(self.iupac_mode and (sts.ambig_primer & PRIMER1))
+        iupac_p2 = bool(self.iupac_mode and (sts.ambig_primer & PRIMER2))
+
         # Check if the whole primer matches (not just the hash word)
-        if k + len_p1 <= seq_len and self._compare_seqs(sequence[k : k + len_p1], primer1, "+"):
+        if k + len_p1 <= seq_len and self._compare_seqs(
+            sequence[k : k + len_p1], primer1, "+", iupac_p1
+        ):
             primer2 = sts.primer2
             len_p2 = len(primer2)
             exp_size = sts.pcr_size
@@ -643,7 +713,7 @@ class MerPCR:
 
             # Ensure p2_pos is valid
             if k + len_p1 <= p2_pos and p2_pos + len_p2 <= seq_len:
-                if self._compare_seqs(sequence[p2_pos : p2_pos + len_p2], primer2, "-"):
+                if self._compare_seqs(sequence[p2_pos : p2_pos + len_p2], primer2, "-", iupac_p2):
                     actual_product_size = (p2_pos + len_p2) - k
                     thread_data.hits.append(
                         STSHit(
@@ -665,7 +735,9 @@ class MerPCR:
                     p2_pos = k + exp_size - len_p2 - i
                     # Ensure second primer is after first primer
                     if k + len_p1 <= p2_pos and p2_pos + len_p2 <= seq_len:
-                        if self._compare_seqs(sequence[p2_pos : p2_pos + len_p2], primer2, "-"):
+                        if self._compare_seqs(
+                            sequence[p2_pos : p2_pos + len_p2], primer2, "-", iupac_p2
+                        ):
                             actual_product_size = (p2_pos + len_p2) - k
                             thread_data.hits.append(
                                 STSHit(
@@ -680,7 +752,9 @@ class MerPCR:
                 if i <= hi_margin:
                     p2_pos = k + exp_size - len_p2 + i
                     if p2_pos + len_p2 <= seq_len:
-                        if self._compare_seqs(sequence[p2_pos : p2_pos + len_p2], primer2, "-"):
+                        if self._compare_seqs(
+                            sequence[p2_pos : p2_pos + len_p2], primer2, "-", iupac_p2
+                        ):
                             actual_product_size = (p2_pos + len_p2) - k
                             thread_data.hits.append(
                                 STSHit(
@@ -695,10 +769,23 @@ class MerPCR:
 
         return 0
 
-    def _compare_seqs(self, seq1: str, seq2: str, strand: str) -> bool:
-        """Compare two sequences allowing for mismatches."""
+    def _compare_seqs(
+        self, seq1: str, seq2: str, strand: str, iupac: Optional[bool] = None
+    ) -> bool:
+        """
+        Compare a sequence window (seq1) with a primer (seq2) allowing for mismatches.
+
+        Mirrors me-PCR seqmcmp/seqmcmp_ambig: strand "+" protects the last
+        three_prime_match bases, strand "-" protects the first ones. When iupac
+        is true the primer's IUPAC codes are expanded; ambiguity codes in the
+        sequence never match a plain primer base. When iupac is None the
+        engine's IUPAC mode is used.
+        """
         if len(seq1) != len(seq2):
             return False
+
+        if iupac is None:
+            iupac = bool(self.iupac_mode)
 
         mismatches = 0
         seq_len = len(seq1)
@@ -709,25 +796,14 @@ class MerPCR:
                 strand == "-" and i < self.three_prime_match
             )
 
-            # Use IUPAC comparison if enabled
-            if self.iupac_mode:
-                # Get the characters at this position
-                c1 = seq1[i].upper()
-                c2 = seq2[i].upper()
-
-                # Check if either character is in the ambiguity set
-                if c1 in self.iupac_mapping and c2 in self.iupac_mapping:
-                    # Get the expanded character sets
-                    set1 = set(self.iupac_mapping[c1])
-                    set2 = set(self.iupac_mapping[c2])
-
-                    # If the sets have any common elements, it's a match
-                    match = bool(set1.intersection(set2))
-                else:
-                    # If one of the characters isn't recognized, it's not a match
-                    match = c1 == c2
+            c1 = seq1[i].upper()
+            c2 = seq2[i].upper()
+            if iupac:
+                o1 = ord(c1)
+                o2 = ord(c2)
+                match = o1 < 256 and o2 < 256 and bool(self.iupac_match_matrix[o1, o2])
             else:
-                match = seq1[i].upper() == seq2[i].upper()
+                match = c1 == c2
 
             if not match:
                 # No mismatches allowed in 3' protected region

@@ -51,6 +51,9 @@ cdef inline bint compare_seqs_fast(
     """
     Cython-optimized sequence comparison with mismatch tolerance.
 
+    seq1 is the sequence window and seq2 the primer. In IUPAC mode the
+    match matrix is indexed as [sequence_base, primer_base], following me-PCR.
+
     This function is 3-5x faster than the Python version due to:
     - No Python interpreter overhead
     - Direct memory access
@@ -141,6 +144,10 @@ cdef void match_sts_fast(
     cdef int p2_pos, actual_product_size, i
     cdef int sts_margin
     cdef bint match
+    # me-PCR only interprets IUPAC codes for primers that contain them
+    cdef int ambig_flags = sts.ambig_primer
+    cdef bint iupac_p1 = iupac_mode and (ambig_flags & 1)
+    cdef bint iupac_p2 = iupac_mode and (ambig_flags & 2)
 
     # Check if whole primer matches
     if k + len_p1 > seq_len:
@@ -153,7 +160,7 @@ cdef void match_sts_fast(
         mismatches_allowed,
         three_prime_match,
         0,  # '+' strand
-        iupac_mode,
+        iupac_p1,
         iupac_match_matrix
     ):
         return
@@ -189,7 +196,7 @@ cdef void match_sts_fast(
             mismatches_allowed,
             three_prime_match,
             1,  # '-' strand
-            iupac_mode,
+            iupac_p2,
             iupac_match_matrix
         ):
             actual_product_size = (p2_pos + len_p2) - k
@@ -214,7 +221,7 @@ cdef void match_sts_fast(
                     mismatches_allowed,
                     three_prime_match,
                     1,  # '-' strand
-                    iupac_mode,
+                    iupac_p2,
                     iupac_match_matrix
                 ):
                     actual_product_size = (p2_pos + len_p2) - k
@@ -237,7 +244,7 @@ cdef void match_sts_fast(
                     mismatches_allowed,
                     three_prime_match,
                     1,  # '-' strand
-                    iupac_mode,
+                    iupac_p2,
                     iupac_match_matrix
                 ):
                     actual_product_size = (p2_pos + len_p2) - k

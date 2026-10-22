@@ -13,7 +13,7 @@ _scode[ord("A")] = _scode[ord("a")] = 0
 _scode[ord("C")] = _scode[ord("c")] = 1
 _scode[ord("G")] = _scode[ord("g")] = 2
 _scode[ord("T")] = _scode[ord("t")] = 3
-_scode[ord("U")] = _scode[ord("u")] = 3
+# As in me-PCR, only A, C, G and T can be hashed; U counts as ambiguous.
 
 # Complement table
 _compl = {
@@ -49,6 +49,10 @@ def hash_value(primer: str, wordsize: int) -> Tuple[int, int]:
     """
     Compute a hash value for the specified primer.
 
+    This follows me-PCR (stsmatch.cpp, HashValue): the word is taken from the
+    3' end of the primer and the search moves backwards when an ambiguous base
+    prevents a hash from being formed.
+
     Args:
         primer: The primer sequence
         wordsize: Word size for hashing
@@ -62,22 +66,23 @@ def hash_value(primer: str, wordsize: int) -> Tuple[int, int]:
     if primer_len < wordsize:
         return -1, 0
 
-    # Try all possible positions for the hash word
-    for offset in range(primer_len - wordsize + 1):
+    offset = primer_len - wordsize
+    while offset >= 0:
         hash_val = 0
-        valid_hash = True
-
-        for i in range(wordsize):
-            base = primer[offset + i]
-            code = _scode[ord(base)]
+        i = 0
+        while i < wordsize:
+            char_code = ord(primer[offset + i])
+            code = _scode[char_code] if char_code < 256 else AMBIG
             if code == AMBIG:
-                valid_hash = False
+                # Jump back past the ambiguous base, as me-PCR does
+                offset -= wordsize - i - 1
                 break
-
             hash_val = (hash_val << 2) | code
+            i += 1
 
-        if valid_hash:
+        if i == wordsize:
             return offset, hash_val
+        offset -= 1
 
     return -1, 0
 

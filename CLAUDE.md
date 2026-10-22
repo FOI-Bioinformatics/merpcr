@@ -8,9 +8,9 @@ This file provides comprehensive guidance to Claude Code (claude.ai/code) when w
 - **Test Coverage**: **94% for engine.py** (critical component), comprehensive edge case testing
 - **Test Suite**: 277 comprehensive tests across 19 test files
 - **Architecture**: Modular, typed, thread-safe
-- **Compatibility**: 100% me-PCR output compatibility - verified on 42 real genomes
+- **Compatibility**: me-PCR output compatibility verified on 42 real genomes and by differential fuzzing against the me-PCR 1.0.6 binary (scripts/compare_with_mepcr.py)
 - **Performance**: Optimized multithreading for large datasets
-- **Critical Fixes**: 3 algorithmic differences fixed (see VERIFICATION.md)
+- **Critical Fixes**: 3 algorithmic differences fixed (see VERIFICATION.md), plus the 2026-10 binary audit (alias column, FASTA alphabet, one-directional IUPAC matching, scan-order reporting, overlap deduplication; see CHANGELOG.md)
 
 ## Critical Compatibility Fixes ⚠️
 
@@ -35,7 +35,7 @@ Three critical algorithmic differences were identified and fixed to achieve 100%
 - **Status:** ✅ FIXED in engine.py:load_sts_file()
 - **Tests:** tests/test_forward_strand_matching.py (8 tests)
 
-📄 **Full details:** [docs/VERIFICATION.md](docs/VERIFICATION.md)
+Full details: [docs/VERIFICATION.md](docs/VERIFICATION.md). Documentation files: docs/USER_GUIDE.md, docs/API.md, docs/VERIFICATION.md, docs/PERFORMANCE.md, docs/DEVELOPMENT.md (CI and release process).
 
 ---
 
@@ -69,6 +69,8 @@ Three critical algorithmic differences were identified and fixed to achieve 100%
 
 ### Compatibility Testing
 - `python test_compatibility.py` - Verify me-PCR output compatibility
+- `python scripts/compare_with_mepcr.py --mepcr /path/to/me-PCR -n 50` - Differential fuzzing against the me-PCR binary (add `--pure-python` to test the fallback path)
+- Deliberate deviations from me-PCR 1.0.6: size ranges and "-" are accepted (the binary rejects them); STS lines after a comment are reported correctly (the binary misreports them)
 - Test both argument formats: `-M 50` and `M=50`
 
 ## Production Architecture
@@ -147,7 +149,7 @@ src/merpcr/
 ### Production Configuration
 
 #### System Requirements
-- **Python**: 3.8+ (tested on 3.8-3.12)
+- **Python**: 3.11+ (tested on 3.11-3.13)
 - **Memory**: Scales with dataset size, ~1GB for human genome
 - **CPU**: Multithreading benefits from 2+ cores
 - **Storage**: Handles files up to several GB

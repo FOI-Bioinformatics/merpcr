@@ -4,8 +4,14 @@ Comprehensive tests for utility functions with full coverage.
 
 import pytest
 
-from merpcr.core.utils import (AMBIG, _compl, _scode, hash_value,
-                               init_iupac_tables, reverse_complement)
+from merpcr.core.utils import (
+    AMBIG,
+    _compl,
+    _scode,
+    hash_value,
+    init_iupac_tables,
+    reverse_complement,
+)
 
 
 class TestReverseComplement:
@@ -84,7 +90,7 @@ class TestHashValue:
         """Test basic hash computation."""
         # Test with wordsize 3
         offset, hash_val = hash_value("ATCG", 3)
-        assert offset == 0  # Should find valid hash at beginning
+        assert offset == 1  # me-PCR takes the word from the 3' end
         assert hash_val > 0
 
     def test_wordsize_too_large(self):
@@ -95,9 +101,12 @@ class TestHashValue:
 
     def test_all_positions(self):
         """Test hash computation at different positions."""
-        primer = "NATCGTT"  # N is ambiguous, should skip to position 1
+        primer = "NATCGTT"  # N is ambiguous; the 3'-most word is used
         offset, hash_val = hash_value(primer, 3)
-        assert offset == 1  # Should skip the N at position 0
+        assert offset == 4
+        primer = "ATCGTTN"  # N at the 3' end forces a step back
+        offset, hash_val = hash_value(primer, 3)
+        assert offset == 3
 
     def test_no_valid_hash(self):
         """Test when no valid hash can be computed."""
@@ -252,8 +261,9 @@ class TestScodeLookupTable:
         assert _scode[ord("g")] == 2
         assert _scode[ord("T")] == 3
         assert _scode[ord("t")] == 3
-        assert _scode[ord("U")] == 3
-        assert _scode[ord("u")] == 3
+        # me-PCR only hashes A, C, G and T; U is ambiguous
+        assert _scode[ord("U")] == AMBIG
+        assert _scode[ord("u")] == AMBIG
 
     def test_scode_ambiguous_mapping(self):
         """Test that ambiguous bases map to AMBIG."""

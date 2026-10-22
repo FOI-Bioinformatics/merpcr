@@ -40,7 +40,11 @@ merpcr = "merpcr.cli:main"
 dev = [
     "pytest>=7.0",
     "pytest-cov",
+    "pytest-timeout",
+    "hypothesis",
+    "psutil",
     "black",
+    "isort",
     "flake8",
     "mypy",
     "Cython>=3.0.0",

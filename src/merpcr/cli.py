@@ -54,6 +54,10 @@ def convert_mepcr_arguments(args: List[str]) -> List[str]:
         elif arg == "-help":
             # Convert me-PCR help to standard help
             converted_args.append("--help")
+        elif arg == "-margin" and i + 1 < len(args):
+            # Legacy me-PCR spelling of the margin option
+            converted_args.extend(["-M", args[i + 1]])
+            i += 1
         else:
             # Keep all other arguments as is
             converted_args.append(arg)

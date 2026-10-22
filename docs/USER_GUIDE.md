@@ -1,513 +1,99 @@
-# merPCR User Guide
+# User Guide
 
-This guide provides detailed instructions for using merPCR effectively for genomic STS marker searching.
+This guide describes the input and output formats of merPCR, the search parameters, the search algorithm, and how to move from me-PCR.
 
-## Table of Contents
+## Input files
 
-1. [Getting Started](#getting-started)
-2. [Understanding STS Markers](#understanding-sts-markers)
-3. [Preparing Your Data](#preparing-your-data)
-4. [Command Line Usage](#command-line-usage)
-5. [Parameter Tuning](#parameter-tuning)
-6. [Interpreting Results](#interpreting-results)
-7. [Common Workflows](#common-workflows)
-8. [Troubleshooting](#troubleshooting)
-9. [Performance Optimization](#performance-optimization)
+### STS file
 
-## Getting Started
-
-### Quick Start
-
-1. **Install merPCR**:
-   ```bash
-   pip install -e .
-   ```
-
-2. **Prepare your data**:
-   - STS marker file (tab-delimited)
-   - FASTA sequence file
-
-3. **Run a basic search**:
-   ```bash
-   merpcr markers.sts genome.fa
-   ```
-
-### Verifying Installation
-
-Test your installation with the provided test data:
-
-```bash
-# Run basic functionality test
-make test-unit
-
-# Run comprehensive integration tests
-make test-integration
-```
-
-## Understanding STS Markers
-
-### What are STS Markers?
-
-Sequence-Tagged Sites (STS) are short DNA sequences that occur only once in the genome and can be easily detected by PCR. They consist of:
-
-- **Two primers**: Short DNA sequences (typically 18-24 nucleotides)
-- **Expected distance**: The anticipated size of the PCR product
-- **Unique identifier**: A name or ID for the marker
-
-### STS Applications
-
-- **Genome mapping**: Physical mapping of chromosomes
-- **Genetic linkage**: Tracking inheritance patterns
-- **Comparative genomics**: Cross-species sequence analysis
-- **Quality control**: Verifying sequence assemblies
-
-## Preparing Your Data
-
-### STS Marker File Specification
-
-Construct tab-delimited input files using the following format:
+The STS file is tab-delimited. Each line describes one marker:
 
 ```
-Identifier	Forward_Primer	Reverse_Primer	Amplicon_Size	[Annotation]
+identifier<TAB>forward primer<TAB>reverse primer<TAB>product size[<TAB>annotation]
 ```
 
-**Representative Examples**:
 ```
 D1S2893	TGAGTCAGATGTTTGATTTTG	ATGCCACATCAACTTATACTG	126	1p36.33
 D1S468	GAATGAACAGAGATGATGCCT	CACACACACACACACCACAC	142-148	1p36.22
 AFM248yg9	GCTAAAAATACACGGATGG	TGCAAGACTGCGTCTC	193	(D17S932) Chr.17, 63.7 cM
 ```
 
-**Field Specifications**:
-- **Identifier**: Unique STS designation (alphanumeric characters and underscores)
-- **Forward_Primer**: 5' to 3' sequence of the forward amplification primer (IUPAC nucleotide codes supported)
-- **Reverse_Primer**: 5' to 3' sequence of the reverse amplification primer
-- **Amplicon_Size**: Predicted PCR product size in base pairs
-  - Single value: `200`
-  - Range notation: `150-250` (system calculates mean value: 200)
-- **Annotation**: Optional descriptive metadata (supports spaces and special characters)
+- Both primers are given 5' to 3'. Lower-case letters are accepted. IUPAC ambiguity codes are allowed and are interpreted when `-I 1` is set.
+- The product size is the length of the amplicon including both primers. A value of `0` or `-` means unknown, and the default size (`-Z`, 240 bp) is used. A range such as `142-148` is replaced by its mean, and the margin for that marker is widened by `high - mean + 1` so that the whole range is covered.
+- If the sum of the primer lengths exceeds the product size, the size is raised to that sum and a warning is logged.
+- A primer shorter than the word size cannot be searched for; the marker is skipped with a warning. A marker whose forward primer contains no window of `W` unambiguous bases is skipped as well.
+- The annotation is everything after the fourth tab, including further tabs, and is reproduced verbatim in the output.
+- Lines starting with `#` and blank lines are ignored. Lines longer than the `-S` limit (1022 characters by default) are an error, as in me-PCR.
 
-**Format Requirements**:
-- Utilize tab characters for field separation (not spaces)
-- Lines prefixed with `#` are interpreted as comments
-- Empty lines are ignored during processing
-- Primer sequences must be specified in 5' to 3' orientation
-- Amplicon size excludes primer sequences themselves
+### FASTA file
 
-### FASTA File Format
+Standard FASTA with one or more records. The sequence label is the text between `>` and the first space or tab. Sequence lines are upper-cased and filtered with the me-PCR nucleotide alphabet `GATCNBDHKMRSVWY-`: other characters, including `X` and `U`, are removed, while the gap character `-` is kept and occupies a position.
 
-Standard FASTA format is supported:
+## Output
+
+One line per hit, tab-delimited:
 
 ```
->sequence_identifier Description
-ATCGATCGATCGATCG
-GGCCTTAAGGCCTTAA
->another_sequence
-AAAATTTTCCCCGGGG
+label<TAB>start..end<TAB>identifier[<TAB>annotation]<TAB>(strand)
 ```
 
-**Requirements**:
-- Standard FASTA headers starting with `>`
-- DNA sequences using A, T, C, G
-- IUPAC ambiguity codes (N, R, Y, etc.) are supported when IUPAC mode is enabled
-- Sequences can span multiple lines
-- No maximum sequence length
+Positions are 1-based and inclusive and span the whole product from the first base of one primer to the last base of the other. The annotation column is present only if the STS line had one. The strand is `(+)` when the forward primer matches the given strand and the reverse primer matches the opposite strand, and `(-)` for the reverse arrangement.
 
-## Command Line Usage
+Hits are reported per sequence in the order the scan finds them. Because the scan triggers on the 3'-most word of a primer, a marker with a shorter primer can be reported before a marker that starts earlier, and markers sharing a hash word are checked most-recent-first. This matches me-PCR; sort the output by position if a positional order is needed.
 
-### Basic Syntax
+## Parameters
+
+| Option | Default | Range | Description |
+|--------|---------|-------|-------------|
+| `-M`, `--margin` | 50 | 0 to 10000 | Products from `size - M` to `size + M` are accepted |
+| `-N`, `--mismatches` | 0 | 0 to 10 | Mismatches allowed in each primer |
+| `-W`, `--wordsize` | 11 | 3 to 16 | Length of the hash word taken from the 3' end of each primer |
+| `-X`, `--three-prime-match` | 1 | 0 or more | Number of 3'-terminal bases in which no mismatch is allowed |
+| `-I`, `--iupac` | 0 | 0 or 1 | Interpret IUPAC codes in primers |
+| `-Z`, `--default-pcr-size` | 240 | 1 to 10000 | Product size used for markers with size 0 or `-` |
+| `-T`, `--threads` | 1 | 1 or more | Worker processes per sequence |
+| `-S`, `--max-sts-line-length` | 1022 | 1 or more | Maximum length of an STS line |
+| `-O`, `--output` | stdout | | Output file |
+| `-Q`, `--quiet` | 1 | 0 or 1 | 0 prints progress and statistics to stderr |
+| `--debug` | | | Debug logging |
+
+Every option can also be written in the me-PCR form `M=50`, and the legacy `-margin 50` is accepted.
+
+### Choosing parameters
+
+- The word size controls sensitivity to mismatches near the 3' end of the forward primer: the `W` 3'-most bases of the primer that triggers the hash lookup must match exactly, independent of `-N`. Smaller values find more candidates and cost more time.
+- With `-N 0` the `-X` setting has no effect. With `-N > 0`, `-X 1` (the default) still requires the terminal base of each primer to match, which mirrors the requirement for polymerase extension.
+- In IUPAC mode a code in a primer matches each base it stands for (R matches A or G, N matches any base). An ambiguity code in the sequence does not match a plain primer base, so an N in the genome counts as a mismatch. Only primers that contain codes are compared this way; others are compared exactly.
+- The margin is applied symmetrically around the expected size. me-PCR tests the expected size first and then increasing deviations, and all positions that match are reported, so one marker can produce several hits with the same start.
+
+## Search algorithm
+
+1. Every primer is reduced to a 2-bit hash of its 3'-most `W` unambiguous bases. For each marker two records are stored: forward primer followed by the reverse complement of the reverse primer (strand `+`), and reverse primer followed by the reverse complement of the forward primer (strand `-`).
+2. The sequence is scanned once with a rolling hash. Windows containing an ambiguous base are skipped. Each hash hit is verified by comparing the whole first primer, allowing `N` mismatches outside the protected 3' region.
+3. The second primer is searched at the expected distance, then at distances `size - 1`, `size + 1`, `size - 2`, ... up to the margin, clipped so that the primers do not overlap and the product stays within the sequence.
+4. With `T > 1` the sequence is cut into `T` chunks that overlap by `max product size + margin - 1` bases. Hits whose end lies within the leading overlap of a chunk other than the first are duplicates and are dropped. Files smaller than 100 kB are processed with one worker.
+
+## Moving from me-PCR
+
+Replace the executable name; the arguments and the output are unchanged:
 
 ```bash
-merpcr [OPTIONS] sts_file fasta_file
+me-PCR markers.sts genome.fa M=50 N=1 > hits.txt
+merpcr markers.sts genome.fa M=50 N=1 > hits.txt
 ```
 
-### Essential Options
+Differences that may be noticed:
 
-#### Search Parameters
-- `-M, --margin INT`: Distance tolerance around expected PCR size (default: 50)
-  - Example: If PCR size is 200 and margin is 50, matches from 150-250 bp are accepted
+- Diagnostics go through Python logging and are more descriptive. Progress messages appear with `-Q 0` or `--debug`.
+- Size ranges and `-` in the size column are accepted. me-PCR 1.0.6 exits with a format error for both.
+- Markers that follow a comment line are reported correctly. me-PCR 1.0.6 reads the wrong line when reporting them.
+- Threads are worker processes. Results do not depend on `-T`.
 
-- `-N, --mismatches INT`: Number of mismatches allowed in primers (default: 0)
-  - Each primer can have up to N mismatches
-  - Mismatches in 3' region may be restricted (see `-X`)
-
-- `-W, --wordsize INT`: Hash word size for initial matching (3-16, default: 11)
-  - Larger values: faster but more memory usage
-  - Must be ≤ length of shortest primer
-
-#### Primer Matching
-- `-X, --three-prime-match INT`: 3' bases requiring exact match (default: 1)
-  - Forward primer: protects rightmost X bases
-  - Reverse primer: protects leftmost X bases (5' of reverse complement)
-  - Set to 0 to disable 3' protection
-
-- `-I, --iupac INT`: Handle IUPAC ambiguity codes (0=no, 1=yes, default: 0)
-  - When enabled: N matches any base, R matches A/G, etc.
-  - Useful for degenerate primers
-
-#### Output Options
-- `-O, --output FILE`: Write results to file instead of stdout
-- `-Q, --quiet INT`: Verbosity level
-  - 0: Verbose (shows progress, statistics)
-  - 1: Quiet (results only, default)
-
-#### Performance Options
-- `-T, --threads INT`: Number of processing threads (default: 1)
-  - Set to number of CPU cores for best performance
-  - Automatically limited to 1 for small sequences (<100KB)
-
-- `-Z, --default-pcr-size INT`: Default PCR size when not specified (default: 240)
-
-### Advanced Options
-
-- `--debug`: Enable detailed logging and debugging output
-- `-v, --version`: Show version information
-- `--help`: Show all options and usage examples
-
-## Parameter Tuning
-
-### Choosing the Right Parameters
-
-#### Word Size (-W)
-```bash
-# Conservative search (slower, more thorough)
-merpcr -W 8 markers.sts genome.fa
-
-# Standard search (balanced)
-merpcr -W 11 markers.sts genome.fa
-
-# Fast search (faster, uses more memory)
-merpcr -W 14 markers.sts genome.fa
-```
-
-**Guidelines**:
-- W=8-10: Use for highly divergent sequences or short primers
-- W=11-12: Good balance for most applications
-- W=13-16: Use for very similar sequences or when speed is critical
-
-#### Margin (-M)
-```bash
-# Strict size matching
-merpcr -M 10 markers.sts genome.fa
-
-# Standard tolerance  
-merpcr -M 50 markers.sts genome.fa
-
-# Flexible size matching
-merpcr -M 200 markers.sts genome.fa
-```
-
-**Guidelines**:
-- Small margin (10-25): When PCR sizes are well-characterized
-- Medium margin (50-100): Standard for most applications
-- Large margin (100+): For poorly characterized STSs or divergent species
-
-#### Mismatches (-N)
-```bash
-# Exact matching only
-merpcr -N 0 markers.sts genome.fa
-
-# Allow some variation
-merpcr -N 1 markers.sts genome.fa
-
-# Highly permissive
-merpcr -N 3 markers.sts genome.fa
-```
-
-**Guidelines**:
-- N=0: High-quality sequences, exact matches needed
-- N=1-2: Standard for most genomic searches
-- N=3+: Highly divergent sequences or cross-species analysis
-
-### Common Parameter Combinations
-
-#### High-Specificity Search
-```bash
-# Strict parameters for high-confidence results
-merpcr -M 25 -N 0 -X 2 -W 11 markers.sts genome.fa
-```
-
-#### Sensitive Search
-```bash
-# Permissive parameters to find more hits
-merpcr -M 100 -N 2 -X 0 -W 8 -I 1 markers.sts genome.fa
-```
-
-#### Performance-Optimized
-```bash
-# Fast search with multiple threads
-merpcr -W 12 -T 8 -Q 1 markers.sts genome.fa
-```
-
-## Interpreting Results
-
-### Output Format
-
-Each hit is reported in this format:
-```
-SequenceLabel	Position1..Position2	STS_ID	(Direction)
-```
-
-**Example Output**:
-```
-chr1	1000..1200	D1S2893	(+)
-chr1	5000..5150	D1S468	(-)
-chr17	30000..30193	AFM248yg9	(+)
-```
-
-**Field Descriptions**:
-- **SequenceLabel**: Name from FASTA header (first word after `>`)
-- **Position1**: Start position of the match (1-based)
-- **Position2**: End position of the match (1-based)  
-- **STS_ID**: Identifier from the STS file
-- **Direction**: 
-  - `(+)`: Forward strand match
-  - `(-)`: Reverse strand match
-
-### Understanding Positions
-
-Positions represent the **outermost boundaries** of the PCR product:
-
-```
-Sequence: ATCG[PRIMER1]NNNNNNNN[PRIMER2]GCTA
-          1234 5     12      20     27 30
-```
-
-For a match with primers at positions 5-12 and 20-27:
-- **Position1**: 5 (start of first primer)
-- **Position2**: 27 (end of second primer)
-- **PCR Product Length**: 27 - 5 + 1 = 23 bp
-
-### Strand Interpretation
-
-#### Forward Strand (+)
-- Primer1 found at lower position
-- Primer2 found at higher position  
-- Natural PCR orientation
-
-#### Reverse Strand (-)
-- Primer1 (reverse complement) found at higher position
-- Primer2 (reverse complement) found at lower position
-- PCR would amplify the reverse complement
-
-## Common Workflows
-
-### Workflow 1: Basic Genomic Screening
-
-```bash
-# 1. Prepare standard parameters
-merpcr -M 50 -N 1 -W 11 -T 4 -O results.txt markers.sts genome.fa
-
-# 2. Review results
-head -20 results.txt
-
-# 3. Count total hits
-wc -l results.txt
-```
-
-### Workflow 2: Cross-Species Analysis
-
-```bash
-# Use permissive parameters for divergent sequences
-merpcr -M 100 -N 3 -X 0 -I 1 -W 9 -O cross_species.txt \
-       human_markers.sts mouse_genome.fa
-```
-
-### Workflow 3: Quality Control
-
-```bash
-# Strict search to verify expected markers
-merpcr -M 25 -N 0 -X 2 -O qc_results.txt \
-       known_markers.sts assembly.fa
-
-# Compare with expected results
-diff expected_results.txt qc_results.txt
-```
-
-### Workflow 4: Large-Scale Analysis
-
-```bash
-# Process multiple chromosomes efficiently
-for chr in chr{1..22} chrX chrY; do
-    merpcr -M 50 -N 1 -T 8 -O ${chr}_results.txt \
-           markers.sts ${chr}.fa
-done
-
-# Combine results
-cat chr*_results.txt > all_results.txt
-```
+To verify equivalence on your own data, run both programs and compare the outputs with `diff`, or use `scripts/compare_with_mepcr.py` for a randomized comparison.
 
 ## Troubleshooting
 
-### No Results Found
-
-**Possible Causes and Solutions**:
-
-1. **Margin too small**:
-   ```bash
-   # Try larger margin
-   merpcr -M 200 markers.sts genome.fa
-   ```
-
-2. **No mismatches allowed**:
-   ```bash
-   # Allow some variation
-   merpcr -N 2 markers.sts genome.fa
-   ```
-
-3. **3' end protection too strict**:
-   ```bash
-   # Reduce or disable 3' protection
-   merpcr -X 0 markers.sts genome.fa
-   ```
-
-4. **IUPAC codes in primers**:
-   ```bash
-   # Enable IUPAC mode
-   merpcr -I 1 markers.sts genome.fa
-   ```
-
-### Too Many Results
-
-**Solutions**:
-
-1. **Tighten parameters**:
-   ```bash
-   # More stringent search
-   merpcr -M 25 -N 0 -X 2 markers.sts genome.fa
-   ```
-
-2. **Check for repetitive sequences**:
-   - Review primer specificity
-   - Use longer or more specific primers
-   - Filter results by position
-
-### Performance Issues
-
-**Memory Problems**:
-```bash
-# Reduce word size to save memory
-merpcr -W 9 markers.sts genome.fa
-
-# Process smaller sequence files
-```
-
-**Slow Performance**:
-```bash
-# Increase word size (if memory allows)
-merpcr -W 13 -T 8 markers.sts genome.fa
-
-# Use multiple threads
-merpcr -T $(nproc) markers.sts genome.fa
-```
-
-### File Format Errors
-
-**STS File Issues**:
-- Check for consistent tab-delimited format
-- Verify all required fields are present
-- Remove or comment out problematic lines with `#`
-
-**FASTA File Issues**:
-- Ensure proper FASTA format with `>` headers
-- Check for non-DNA characters in sequences
-- Verify file encoding (should be ASCII/UTF-8)
-
-### Debugging
-
-Enable debug mode for detailed information:
-
-```bash
-merpcr --debug -Q 0 markers.sts genome.fa 2> debug.log
-```
-
-This will show:
-- Parameter validation
-- File loading progress  
-- STS processing details
-- Search statistics
-- Error messages
-
-## Performance Optimization
-
-### System Requirements
-
-**Minimum**:
-- 4 GB RAM
-- Single CPU core
-- 1 GB free disk space
-
-**Recommended**:
-- 16+ GB RAM for large genomes
-- 4+ CPU cores for multithreading
-- SSD storage for large sequence files
-
-### Memory Usage Estimation
-
-Approximate memory usage:
-```
-Memory ≈ 4^W * 8 bytes + Sequence_Size + STS_Count * 200 bytes
-```
-
-**Examples**:
-- W=11, 1GB sequence, 1000 STSs: ~4.2 GB RAM
-- W=13, 100MB sequence, 100 STSs: ~1.1 GB RAM
-
-### Performance Tips
-
-1. **Optimize word size**:
-   ```bash
-   # Test different word sizes
-   time merpcr -W 10 markers.sts genome.fa
-   time merpcr -W 11 markers.sts genome.fa
-   time merpcr -W 12 markers.sts genome.fa
-   ```
-
-2. **Use multiple threads appropriately**:
-   ```bash
-   # Check CPU cores
-   nproc
-   
-   # Use all cores for large sequences
-   merpcr -T $(nproc) markers.sts large_genome.fa
-   ```
-
-3. **Process in chunks**:
-   ```bash
-   # Split large files
-   split -l 1000000 huge_genome.fa genome_chunk_
-   
-   # Process each chunk
-   for chunk in genome_chunk_*; do
-       merpcr markers.sts $chunk > ${chunk}_results.txt
-   done
-   ```
-
-4. **Optimize I/O**:
-   ```bash
-   # Use fast storage for temporary files
-   export TMPDIR=/fast/ssd/tmp
-   
-   # Redirect output efficiently  
-   merpcr markers.sts genome.fa > /fast/ssd/results.txt
-   ```
-
-### Benchmarking
-
-Use the built-in performance tests:
-
-```bash
-# Run performance benchmarks
-make test-performance
-
-# Or manually
-SKIP_PERFORMANCE_TESTS= pytest tests/test_performance.py -v
-```
-
-This will test:
-- Large sequence processing speed
-- Memory usage patterns
-- Threading efficiency
-- Scalability characteristics
-
-The results help you choose optimal parameters for your specific system and data.
+- No hits: increase `-M`, allow mismatches with `-N`, set `-X 0`, or enable `-I 1` if primers contain ambiguity codes. Check that the STS file is tab-delimited.
+- Too many hits: lower `-M`, set `-N 0`, raise `-X`, or review primer specificity.
+- Format error on an STS line: the line has fewer than four tab-separated fields or exceeds the `-S` limit.
+- Slow runs: use `-T` with the number of available cores on large sequences, and make sure the Cython extension is in use (`--debug` logs whether it was loaded).

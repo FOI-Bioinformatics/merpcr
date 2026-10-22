@@ -1,306 +1,87 @@
-# API Technical Specification
+# API Reference
 
-This document provides comprehensive technical documentation for the merPCR software package interface.
+The public interface is the `MerPCR` class and the data classes exported from the `merpcr` package.
 
-## Primary Classes
+```python
+from merpcr import MerPCR, STSRecord, FASTARecord, STSHit
+```
 
-### MerPCR
-
-Principal computational engine class implementing STS marker detection algorithms for genomic sequence analysis.
-
-#### Constructor
+## MerPCR
 
 ```python
 MerPCR(
-    wordsize: int = 11,
-    margin: int = 50,
-    mismatches: int = 0,
-    three_prime_match: int = 1,
-    threads: int = 1,
-    quiet: int = 1,
-    default_pcr_size: int = 240,
-    iupac_mode: int = 0
+    wordsize=11,            # hash word size, 3 to 16
+    margin=50,              # size tolerance in bp, 0 to 10000
+    mismatches=0,           # mismatches per primer, 0 to 10
+    three_prime_match=1,    # protected 3' bases, 0 or more
+    iupac_mode=0,           # 1 interprets IUPAC codes in primers
+    default_pcr_size=240,   # size for markers given as 0 or "-", 1 to 10000
+    threads=1,              # worker processes per sequence
+    max_sts_line_length=1022,
 )
 ```
 
-**Parameter Specifications:**
-- `wordsize` (int): Hash word length for initial sequence matching (valid range: 3-16). Default: 11
-- `margin` (int): Maximum permitted deviation from expected PCR amplicon size (valid range: 0-10000). Default: 50
-- `mismatches` (int): Permitted mismatch count in primer-template alignment (valid range: 0-10). Default: 0
-- `three_prime_match` (int): Required exact match length at primer 3' terminus. Default: 1
-- `threads` (int): Concurrent processing thread count for computational parallelization. Default: 1
-- `quiet` (int): Logging verbosity control (0=detailed output, 1=minimal output). Default: 1
-- `default_pcr_size` (int): Default amplicon size for undefined PCR products (valid range: 50-10000). Default: 240
-- `iupac_mode` (int): IUPAC ambiguity nucleotide code processing (0=disabled, 1=enabled). Default: 0
+Parameters outside their range raise `ValueError`.
 
-**Exception Handling:**
-- `ValueError`: Raised when input parameters exceed defined validation ranges
+### load_sts_file(filename) -> bool
 
-#### Methods
+Reads a tab-delimited STS file and builds the hash table. Returns `False`, after logging an error, when the file is empty, a line has fewer than four fields, or a line exceeds `max_sts_line_length`. Markers with unusable primers are skipped with a warning. After loading, `sts_records` holds two `STSRecord` objects per usable marker (strands `+` and `-`), `sts_table` maps hash values to lists of records, and `max_pcr_size` is the largest product size seen.
 
-##### load_sts_file(filename: str) -> bool
+### load_fasta_file(filename) -> list[FASTARecord]
 
-Imports STS marker definitions from tab-delimited input files.
+Reads all records from a FASTA file. Sequences are upper-cased and restricted to the alphabet `GATCNBDHKMRSVWY-`. The file size is remembered and used to decide whether `threads` may exceed one, as in me-PCR.
 
-**Input Parameters:**
-- `filename` (str): Filesystem path to STS marker definition file
+### search(fasta_records, output_file=None) -> int
 
-**Return Values:**
-- `bool`: Success indicator (True=successful import, False=import failure)
+Searches every record and writes one line per hit to `output_file`, or to standard output when the argument is `None` or `"stdout"`. Returns the number of hits, which is also stored in `total_hits`.
 
-**File Format Specification:**
-Tab-delimited format: `Identifier\tForward_Primer\tReverse_Primer\tAmplicon_Size\t[Optional_Annotation]`
-
-##### load_fasta_file(filename: str) -> List[FASTARecord]
-
-Imports genomic sequences from FASTA-formatted input files.
-
-**Input Parameters:**
-- `filename` (str): Filesystem path to FASTA sequence file
-
-**Return Values:**
-- `List[FASTARecord]`: Collection of parsed sequence records with associated metadata
-
-##### search(fasta_records: List[FASTARecord], output_file: Optional[str] = None) -> int
-
-Executes STS marker detection algorithms against target genomic sequences.
-
-**Input Parameters:**
-- `fasta_records` (List[FASTARecord]): Target genomic sequences for analysis
-- `output_file` (Optional[str]): Output destination specification (None directs to stdout)
-
-**Return Values:**
-- `int`: Total count of detected STS marker matches
-
-## Data Structure Specifications
+## Data classes
 
 ### STSRecord
 
-Data structure representing Sequence-Tagged Site marker definitions.
-
-```python
-@dataclass
-class STSRecord:
-    id: str                    # Unique STS identifier
-    primer1: str              # Forward primer sequence (5' to 3')
-    primer2: str              # Reverse primer sequence (5' to 3')
-    pcr_size: int            # Predicted PCR amplicon size
-    alias: str = ""          # Optional descriptive annotation
-    offset: int = 0          # Positional offset within input file
-    hash_offset: int = 0     # Hash computation positional offset
-    direct: str = '+'        # Amplification strand orientation ('+' forward, '-' reverse)
-    ambig_primer: int = 0    # IUPAC ambiguity presence indicator
-```
+| Field | Type | Meaning |
+|-------|------|---------|
+| `id` | str | Identifier from the first column |
+| `primer1` | str | Primer searched on the given strand |
+| `primer2` | str | Reverse complement of the partner primer, searched downstream |
+| `pcr_size` | int | Expected product size after range and minimum adjustments |
+| `alias` | str or None | Text after the fourth tab; `None` when the line had no fifth field |
+| `offset` | int | Line number in the STS file |
+| `hash_offset` | int | Position of the hash word within `primer1` |
+| `direct` | str | `"+"` or `"-"` |
+| `ambig_primer` | int | Bit 1: `primer1` contains IUPAC codes; bit 2: `primer2` does (set only in IUPAC mode) |
+| `margin` | int | Margin for this marker, including the range adjustment |
 
 ### FASTARecord
 
-Represents a FASTA sequence record.
-
-```python
-@dataclass
-class FASTARecord:
-    defline: str             # FASTA header line
-    sequence: str            # DNA sequence
-    label: str = ""          # Extracted sequence label
-    
-    def __post_init__(self):
-        # Automatically extracts label from defline if not provided
-```
+`defline`, `sequence` and `label`. The label defaults to the first word of the defline after `>`; it is empty if the defline has no text.
 
 ### STSHit
 
-Represents a found STS match.
+`pos1`, `pos2` (0-based, inclusive, relative to the sequence) and the matching `STSRecord`.
+
+## Lower-level functions
+
+- `merpcr.core.utils.hash_value(primer, wordsize)` returns `(offset, hash)` for the 3'-most unambiguous word, or `(-1, 0)`.
+- `merpcr.core.utils.reverse_complement(sequence)` handles IUPAC codes and maps unknown characters to `N`.
+- `merpcr.io.fasta.FASTALoader.load_file(filename)` is the FASTA reader used by `MerPCR`.
+- `merpcr.io.sts.STSLoader(wordsize, margin, default_pcr_size, iupac_mode=0).load_file(filename)` returns `(records, table, max_pcr_size)` using the engine's parser.
+
+Methods of `MerPCR` whose names start with an underscore (`_hash_value`, `_compare_seqs`, `_match_sts`, `_process_thread`) implement the algorithm and may change between releases.
+
+## Example
 
 ```python
-@dataclass
-class STSHit:
-    pos1: int                # Start position of match
-    pos2: int                # End position of match  
-    sts: STSRecord           # The STS that matched
-```
-
-### ThreadData
-
-Data structure for multithreaded processing.
-
-```python
-@dataclass
-class ThreadData:
-    thread_id: int           # Thread identifier
-    sequence: str            # Sequence segment
-    offset: int              # Global offset
-    length: int              # Segment length
-    hits: List[STSHit] = field(default_factory=list)  # Found hits
-```
-
-## I/O Modules
-
-### FASTALoader
-
-Static methods for loading FASTA files.
-
-#### load_file(filename: str) -> List[FASTARecord]
-
-Load sequences from a FASTA file with proper error handling.
-
-**Parameters:**
-- `filename` (str): Path to FASTA file
-
-**Returns:**
-- `List[FASTARecord]`: List of parsed sequences
-
-**Features:**
-- Handles multiline sequences
-- Filters invalid characters
-- Preserves IUPAC ambiguity codes
-- Robust error handling
-
-## Internal Methods
-
-The following methods are available but primarily intended for internal use:
-
-### MerPCR Internal Methods
-
-#### _hash_value(sequence: str) -> Tuple[int, int]
-
-Compute hash value for sequence matching.
-
-**Returns:**
-- `Tuple[int, int]`: (offset, hash_value) or (-1, 0) if invalid
-
-#### _compare_seqs(seq1: str, seq2: str, direction: str) -> bool
-
-Compare two sequences allowing for mismatches and 3' protection.
-
-**Parameters:**
-- `seq1` (str): First sequence
-- `seq2` (str): Second sequence  
-- `direction` (str): Strand direction ('+' or '-')
-
-**Returns:**
-- `bool`: True if sequences match within tolerance
-
-#### _reverse_complement(sequence: str) -> str
-
-Generate reverse complement of a DNA sequence.
-
-**Parameters:**
-- `sequence` (str): Input DNA sequence
-
-**Returns:**
-- `str`: Reverse complement sequence
-
-## Usage Examples
-
-### Basic Usage
-
-```python
-from merpcr import MerPCR
-
-# Create engine with default parameters
-mer_pcr = MerPCR()
-
-# Load data
-success = mer_pcr.load_sts_file("markers.sts")
-if not success:
-    print("Failed to load STS file")
-    exit(1)
-
-sequences = mer_pcr.load_fasta_file("genome.fa")
-if not sequences:
-    print("No sequences loaded")
-    exit(1)
-
-# Search for matches
-hit_count = mer_pcr.search(sequences, "results.txt")
-print(f"Found {hit_count} hits")
-```
-
-### Advanced Usage
-
-```python
-from merpcr import MerPCR, FASTARecord
-
-# Create engine with custom parameters
-mer_pcr = MerPCR(
-    wordsize=11,
-    margin=100,
-    mismatches=2,
-    three_prime_match=2,
-    threads=4,
-    iupac_mode=1,
-    quiet=0  # Verbose output
-)
-
-# Manual FASTA record creation
-sequence = FASTARecord(
-    defline=">chromosome1",
-    sequence="ATCGATCGATCGATCG"
-)
-
-# Search with programmatically created sequences
-mer_pcr.load_sts_file("markers.sts")
-hits = mer_pcr.search([sequence])
-```
-
-### Error Handling
-
-```python
-from merpcr import MerPCR
 import logging
+from merpcr import MerPCR
 
-# Enable logging to see detailed error messages
 logging.basicConfig(level=logging.INFO)
 
-try:
-    # Parameters will be validated
-    mer_pcr = MerPCR(wordsize=20)  # Will raise ValueError
-except ValueError as e:
-    print(f"Invalid parameter: {e}")
+engine = MerPCR(margin=100, mismatches=1, iupac_mode=1, threads=4)
+if not engine.load_sts_file("markers.sts"):
+    raise SystemExit("could not read markers.sts")
 
-# File loading with error checking
-mer_pcr = MerPCR()
-if not mer_pcr.load_sts_file("nonexistent.sts"):
-    print("STS file not found or invalid")
-
-sequences = mer_pcr.load_fasta_file("nonexistent.fa")
-if not sequences:
-    print("FASTA file not found or empty")
+records = engine.load_fasta_file("assembly.fa")
+n = engine.search(records, output_file="hits.txt")
+print(f"{n} hits in {len(records)} sequences")
 ```
-
-## Performance Considerations
-
-### Thread Usage
-
-- For sequences < 100KB, single-threaded processing is used regardless of thread setting
-- Optimal thread count is typically equal to the number of CPU cores
-- Memory usage increases with thread count and word size
-
-### Word Size Selection
-
-- Larger word sizes (11-12) provide faster initial matching but use more memory
-- Smaller word sizes (7-10) are more thorough but slower
-- Word size must be ≤ shortest primer length
-
-### Memory Usage
-
-- Memory usage scales with: `O(4^wordsize + sequence_length + num_sts)`
-- For large genomes, consider processing chromosome by chromosome
-- Monitor memory usage with performance tests
-
-## Compatibility
-
-### me-PCR Compatibility
-
-This implementation is designed to be fully compatible with the original me-PCR:
-
-- Identical command-line interface
-- Same output format
-- Equivalent search algorithms
-- Matching parameter validation
-
-### Python Version Requirements
-
-- Python 3.9+
-- Standard library only (no external dependencies for core functionality)
-- Optional: psutil for memory monitoring in tests
