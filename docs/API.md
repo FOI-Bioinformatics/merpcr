@@ -26,11 +26,11 @@ Parameters outside their range raise `ValueError`.
 
 ### load_sts_file(filename) -> bool
 
-Reads a tab-delimited STS file and builds the hash table. Returns `False`, after logging an error, when the file is empty, a line has fewer than four fields, or a line exceeds `max_sts_line_length`. Markers with unusable primers are skipped with a warning. After loading, `sts_records` holds two `STSRecord` objects per usable marker (strands `+` and `-`), `sts_table` maps hash values to lists of records, and `max_pcr_size` is the largest product size seen.
+Reads a tab-delimited STS file (plain, or compressed with gzip, bzip2 or xz according to the extension) and builds the hash table. Returns `False`, after logging an error, when the file is empty, a line has fewer than four fields, or a line exceeds `max_sts_line_length`. Markers with unusable primers are skipped with a warning. After loading, `sts_records` holds two `STSRecord` objects per usable marker (strands `+` and `-`), `sts_table` maps hash values to lists of records, and `max_pcr_size` is the largest product size seen.
 
 ### load_fasta_file(filename) -> list[FASTARecord]
 
-Reads all records from a FASTA file. Sequences are upper-cased and restricted to the alphabet `GATCNBDHKMRSVWY-`. The file size is remembered and used to decide whether `threads` may exceed one, as in me-PCR.
+Reads all records from a FASTA file, decompressing `.gz`, `.bz2`, `.xz` and `.lzma` files by extension. Sequences are upper-cased and restricted to the alphabet `GATCNBDHKMRSVWY-`. The file size is remembered and used to decide whether `threads` may exceed one, as in me-PCR.
 
 ### find_hits(fasta_records) -> list[SearchHit]
 
@@ -74,6 +74,7 @@ Internal representation with 0-based positions `pos1`, `pos2` and the matching `
 - `merpcr.core.utils.hash_value(primer, wordsize)` returns `(offset, hash)` for the 3'-most unambiguous word, or `(-1, 0)`.
 - `merpcr.core.utils.reverse_complement(sequence)` handles IUPAC codes and maps unknown characters to `N`.
 - `merpcr.io.fasta.FASTALoader.load_file(filename)` is the FASTA reader used by `MerPCR`.
+- `merpcr.io.files.open_text(filename)` opens a plain or compressed file for text reading.
 - `merpcr.io.sts.STSLoader(wordsize, margin, default_pcr_size, iupac_mode=0).load_file(filename)` returns `(records, table, max_pcr_size)` using the engine's parser.
 
 Methods of `MerPCR` whose names start with an underscore (`_hash_value`, `_compare_seqs`, `_match_sts`, `_process_thread`) implement the algorithm and may change between releases.

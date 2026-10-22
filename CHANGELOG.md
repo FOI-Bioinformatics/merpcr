@@ -2,6 +2,12 @@
 
 This document records significant modifications and enhancements to the merPCR software package following semantic versioning principles.
 
+## [1.0.4] - Compressed input files
+
+- STS and FASTA files ending in .gz, .bz2, .xz or .lzma are decompressed
+  while reading. For a compressed FASTA file the threading decision uses the
+  total sequence length instead of the size on disk.
+
 ## [1.0.3] - Optional one-sided search for markers with degenerate forward primers
 
 - New option `-U 1` (`U=1`, `MerPCR(one_sided=1)`). me-PCR drops a marker

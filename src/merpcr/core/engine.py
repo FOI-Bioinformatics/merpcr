@@ -15,6 +15,7 @@ from typing import Dict, List, Optional
 import numpy as np
 
 from ..io.fasta import FASTALoader
+from ..io.files import is_compressed, open_text
 from .models import FASTARecord, SearchHit, STSHit, STSRecord, ThreadData
 
 # Try to import Cython-optimized functions
@@ -256,7 +257,7 @@ class MerPCR:
         bad_pcr_size = 0
         one_sided_markers = 0
 
-        with open(filename, "r") as file:
+        with open_text(filename) as file:
             for line_no, raw_line in enumerate(file.readlines(), start=1):
                 line = raw_line.rstrip("\r\n")
 
@@ -507,8 +508,15 @@ class MerPCR:
         return "".join(self.compl.get(base, "N") for base in reversed(sequence))
 
     def load_fasta_file(self, filename: str) -> List[FASTARecord]:
-        """Load sequences from a FASTA file."""
-        self._fasta_file_size = os.path.getsize(filename)
+        """
+        Load sequences from a FASTA file.
+
+        Files ending in .gz, .bz2, .xz or .lzma are decompressed on the fly.
+        me-PCR decides whether to use several threads from the size of the
+        sequence file; for a compressed file the total sequence length is
+        used instead, since the size on disk is not comparable.
+        """
+        self._fasta_file_size = None if is_compressed(filename) else os.path.getsize(filename)
         return FASTALoader.load_file(filename)
 
     def search(self, fasta_records: List[FASTARecord], output_file: str = None) -> int:
