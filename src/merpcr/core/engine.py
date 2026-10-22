@@ -42,6 +42,7 @@ DEFAULT_WORDSIZE = 11
 DEFAULT_MISMATCHES = 0
 DEFAULT_THREE_PRIME_MATCH = 1
 DEFAULT_IUPAC_MODE = 0
+DEFAULT_ONE_SIDED = 0
 DEFAULT_THREADS = 1
 DEFAULT_PCR_SIZE = 240
 
@@ -72,9 +73,11 @@ class MerPCR:
         default_pcr_size: int = DEFAULT_PCR_SIZE,
         threads: int = DEFAULT_THREADS,
         max_sts_line_length: int = 1022,
+        one_sided: int = DEFAULT_ONE_SIDED,
     ):
         """Initialize the MerPCR class with search parameters."""
         self.wordsize = wordsize
+        self.one_sided = one_sided
         self.margin = margin
         self.mismatches = mismatches
         self.three_prime_match = three_prime_match
@@ -220,7 +223,15 @@ class MerPCR:
           everything after the fourth tab is kept verbatim as the alias
         - lines longer than max_sts_line_length are an error
         - an STS whose first primer cannot be hashed is skipped entirely
+          (unless one_sided is set, see below)
         - records sharing a hash value are kept most-recent-first
+
+        With one_sided=1 a marker is kept when only one of its primers has a
+        hash word: the strand record built on that primer is searched and the
+        other strand is dropped. me-PCR drops such a marker completely when the
+        first primer has no hash word, but only drops the "-" record when the
+        second one has none. This option makes the two cases symmetric at the
+        cost of adding hits that me-PCR 1.0.6 does not report.
 
         Two deliberate differences from me-PCR 1.0.6 are kept: size ranges
         ("200-220") and "-" are accepted as documented in the me-PCR source,
@@ -243,6 +254,7 @@ class MerPCR:
         bad_primers_short = 0
         bad_primers_ambig = 0
         bad_pcr_size = 0
+        one_sided_markers = 0
 
         with open(filename, "r") as file:
             for line_no, raw_line in enumerate(file.readlines(), start=1):
@@ -310,28 +322,35 @@ class MerPCR:
                 rev_primer2 = self._reverse_complement(primer2)
 
                 hash_offset1, hash_value1 = self._hash_value(primer1)
-                if hash_offset1 < 0:
-                    # me-PCR drops the whole STS when the first primer has no hash
-                    bad_primers_ambig += 1
-                    continue
-
-                sts_for = STSRecord(
-                    id=sts_id,
-                    primer1=primer1,
-                    primer2=rev_primer2,
-                    pcr_size=pcr_size,
-                    alias=alias,
-                    offset=line_no,
-                    hash_offset=hash_offset1,
-                    direct="+",
-                    ambig_primer=ambig_for,
-                    margin=margin_to_use,
-                )
-                self._insert_sts(sts_for, hash_value1)
-
                 hash_offset2, hash_value2 = self._hash_value(primer2)
+
+                if hash_offset1 < 0:
+                    bad_primers_ambig += 1
+                    if not self.one_sided or hash_offset2 < 0:
+                        # me-PCR drops the whole STS when the first primer has no hash
+                        if self.one_sided and hash_offset2 < 0:
+                            bad_primers_ambig += 1
+                        continue
+                    one_sided_markers += 1
+                else:
+                    sts_for = STSRecord(
+                        id=sts_id,
+                        primer1=primer1,
+                        primer2=rev_primer2,
+                        pcr_size=pcr_size,
+                        alias=alias,
+                        offset=line_no,
+                        hash_offset=hash_offset1,
+                        direct="+",
+                        ambig_primer=ambig_for,
+                        margin=margin_to_use,
+                    )
+                    self._insert_sts(sts_for, hash_value1)
+
                 if hash_offset2 < 0:
                     bad_primers_ambig += 1
+                    if self.one_sided:
+                        one_sided_markers += 1
                     continue
 
                 sts_rev = STSRecord(
@@ -357,6 +376,11 @@ class MerPCR:
         if bad_primers_ambig > 0:
             logger.warning(
                 f"{bad_primers_ambig} primers have ambiguities which prevent computation of a hash value: not included in search"
+            )
+
+        if one_sided_markers > 0:
+            logger.warning(
+                f"{one_sided_markers} STSs are searched on one strand only because the other primer has no hash word"
             )
 
         if bad_pcr_size > 0:

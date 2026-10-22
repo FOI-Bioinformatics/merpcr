@@ -4,7 +4,7 @@ merPCR - Modern Electronic Rapid PCR
 Python reimplementation of the me-PCR (Multithreaded Electronic PCR) program.
 """
 
-__version__ = "1.0.2"
+__version__ = "1.0.3"
 __author__ = "merPCR Contributors"
 __license__ = "GPL-3.0"
 

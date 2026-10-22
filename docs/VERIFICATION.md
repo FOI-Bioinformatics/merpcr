@@ -39,8 +39,9 @@ The first three were found by reading the source during the initial implementati
 - Size ranges (`150-250`) and `-` in the size column are accepted. me-PCR 1.0.6 parses the size with `strtol` and rejects any trailing text, so the range code in the same function is unreachable and the binary exits with "size should be integer".
 - Markers that follow a comment or blank line are reported correctly. me-PCR 1.0.6 does not advance its file offset for such lines and reports the wrong line, or nothing, for the next marker.
 - Diagnostics are written through Python logging rather than to stderr with fixed wording.
+- The optional `-U 1` keeps a marker whose forward primer has no hash word and searches it on the strand its reverse primer allows. me-PCR drops such a marker, although it keeps the forward record when it is the reverse primer that has no hash word. The option is off by default.
 
-Neither difference affects output for inputs that me-PCR accepts and reports correctly.
+With the defaults, none of these differences affects output for inputs that me-PCR accepts and reports correctly.
 
 ## Reproducing the comparison
 

@@ -98,6 +98,78 @@ class TestSTSLoadingEdgeCases:
         finally:
             Path(sts_file).unlink()
 
+    def _write_sts(self, content: str) -> str:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".sts", delete=False) as f:
+            f.write(content)
+            return f.name
+
+    def test_one_sided_marker_dropped_by_default(self):
+        """A marker whose forward primer has no hash word is dropped, as in me-PCR."""
+        # forward primer: longest run of plain bases is 9 (< wordsize 11); reverse primer is plain
+        sts_file = self._write_sts(
+            "OneSided\tAGAGATAAYAATCAACTCWGTTT\tGTCATTCGACTCATTCAGTATC\t360\n"
+        )
+        try:
+            engine = MerPCR(wordsize=11)
+            assert engine.load_sts_file(sts_file) is True
+            assert engine.sts_records == []
+        finally:
+            Path(sts_file).unlink()
+
+    def test_one_sided_marker_kept_with_option(self):
+        """With one_sided=1 the '-' record built on the hashable reverse primer is kept."""
+        sts_file = self._write_sts(
+            "OneSided\tAGAGATAAYAATCAACTCWGTTT\tGTCATTCGACTCATTCAGTATC\t360\n"
+        )
+        try:
+            engine = MerPCR(wordsize=11, one_sided=1)
+            assert engine.load_sts_file(sts_file) is True
+            assert [r.direct for r in engine.sts_records] == ["-"]
+            assert engine.sts_records[0].primer1 == "GTCATTCGACTCATTCAGTATC"
+        finally:
+            Path(sts_file).unlink()
+
+    def test_one_sided_reverse_primer_unhashable_keeps_forward_record(self):
+        """The existing me-PCR behaviour for an unhashable reverse primer is unchanged."""
+        sts_file = self._write_sts("RevBad\tGTCATTCGACTCATTCAGTATC\tAGAGATAAYAATCAACTCWGTTT\t360\n")
+        try:
+            for one_sided in (0, 1):
+                engine = MerPCR(wordsize=11, one_sided=one_sided)
+                assert engine.load_sts_file(sts_file) is True
+                assert [r.direct for r in engine.sts_records] == ["+"]
+        finally:
+            Path(sts_file).unlink()
+
+    def test_one_sided_both_primers_unhashable_is_dropped(self):
+        sts_file = self._write_sts(
+            "BothBad\tAGAGATAAYAATCAACTCWGTTT\tTCCAACTRGATTCTKTTGAGTTT\t300\n"
+        )
+        try:
+            engine = MerPCR(wordsize=11, one_sided=1)
+            assert engine.load_sts_file(sts_file) is True
+            assert engine.sts_records == []
+        finally:
+            Path(sts_file).unlink()
+
+    def test_one_sided_finds_reverse_strand_hit(self):
+        """A product is found when it lies in the orientation the kept record covers."""
+        fwd = "AGAGATAATAATCAACTCTGTTT"  # what the degenerate forward primer stands for (Y=T, W=T)
+        rev = "GTCATTCGACTCATTCAGTATC"
+        insert = "ACGT" * 40
+        product = fwd + insert + MerPCR()._reverse_complement(rev)
+        genome = "GGGG" * 30 + MerPCR()._reverse_complement(product) + "CCCC" * 30
+        sts_file = self._write_sts(f"OneSided\tAGAGATAAYAATCAACTCWGTTT\t{rev}\t{len(product)}\n")
+        try:
+            engine = MerPCR(wordsize=11, iupac_mode=1, one_sided=1)
+            assert engine.load_sts_file(sts_file) is True
+            hits = engine.find_hits([FASTARecord(defline=">g", sequence=genome)])
+            assert [(h.sts_id, h.strand, h.size) for h in hits] == [("OneSided", "-", len(product))]
+            # same product on the other strand is not found: that record was dropped
+            genome_plus = "GGGG" * 30 + product + "CCCC" * 30
+            assert engine.find_hits([FASTARecord(defline=">g", sequence=genome_plus)]) == []
+        finally:
+            Path(sts_file).unlink()
+
     def test_load_sts_triggers_max_pcr_size_update(self):
         """Test that max_pcr_size is updated correctly."""
         engine = MerPCR(wordsize=11)

@@ -2,6 +2,16 @@
 
 This document records significant modifications and enhancements to the merPCR software package following semantic versioning principles.
 
+## [1.0.3] - Optional one-sided search for markers with degenerate forward primers
+
+- New option `-U 1` (`U=1`, `MerPCR(one_sided=1)`). me-PCR drops a marker
+  when its forward primer has no window of W unambiguous bases, but keeps the
+  forward record when it is the reverse primer that has none. With the option
+  the two cases are symmetric: the record built on the hashable primer is kept
+  and the marker is searched on that strand only. A warning reports how many
+  markers were treated this way. Off by default, so default output is
+  unchanged.
+
 ## [1.0.2] - Structured results from the Python API
 
 - Repository layout: ad-hoc comparison and benchmark scripts moved from the

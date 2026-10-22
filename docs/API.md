@@ -15,6 +15,7 @@ MerPCR(
     mismatches=0,           # mismatches per primer, 0 to 10
     three_prime_match=1,    # protected 3' bases, 0 or more
     iupac_mode=0,           # 1 interprets IUPAC codes in primers
+    one_sided=0,            # 1 keeps markers whose forward primer has no hash word (one strand only)
     default_pcr_size=240,   # size for markers given as 0 or "-", 1 to 10000
     threads=1,              # worker processes per sequence
     max_sts_line_length=1022,

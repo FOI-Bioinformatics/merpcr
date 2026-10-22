@@ -10,6 +10,7 @@ from typing import List
 from . import __version__
 from .core.engine import (
     DEFAULT_IUPAC_MODE,
+    DEFAULT_ONE_SIDED,
     DEFAULT_MARGIN,
     DEFAULT_MISMATCHES,
     DEFAULT_PCR_SIZE,
@@ -53,6 +54,8 @@ def convert_mepcr_arguments(args: List[str]) -> List[str]:
                 converted_args.extend(["-I", value])
             elif param == "S":
                 converted_args.extend(["-S", value])
+            elif param == "U":
+                converted_args.extend(["-U", value])
             elif param == "O":
                 converted_args.extend(["-O", value])
             elif param == "P":
@@ -211,6 +214,18 @@ def create_parser() -> argparse.ArgumentParser:
     )
 
     parser.add_argument(
+        "-U",
+        "--one-sided",
+        type=int,
+        choices=[0, 1],
+        default=DEFAULT_ONE_SIDED,
+        help=(
+            "One-sided flag (0=drop a marker whose forward primer has no hash word, as me-PCR does; "
+            "1=search it on the strand its other primer allows)"
+        ),
+    )
+
+    parser.add_argument(
         "-S",
         "--max-sts-line-length",
         type=sts_line_length_type,
@@ -251,6 +266,7 @@ def main() -> int:
             default_pcr_size=args.default_pcr_size,
             threads=args.threads,
             max_sts_line_length=args.max_sts_line_length,
+            one_sided=args.one_sided,
         )
 
         # Load STS file
