@@ -31,9 +31,13 @@ Reads a tab-delimited STS file and builds the hash table. Returns `False`, after
 
 Reads all records from a FASTA file. Sequences are upper-cased and restricted to the alphabet `GATCNBDHKMRSVWY-`. The file size is remembered and used to decide whether `threads` may exceed one, as in me-PCR.
 
+### find_hits(fasta_records) -> list[SearchHit]
+
+Searches every record and returns the hits in output order as `SearchHit` objects (see below). The list is also stored in `hits`.
+
 ### search(fasta_records, output_file=None) -> int
 
-Searches every record and writes one line per hit to `output_file`, or to standard output when the argument is `None` or `"stdout"`. Returns the number of hits, which is also stored in `total_hits`.
+Calls `find_hits` and writes one line per hit to `output_file`, or to standard output when the argument is `None` or `"stdout"`. Returns the number of hits, which is also stored in `total_hits`.
 
 ## Data classes
 
@@ -56,9 +60,13 @@ Searches every record and writes one line per hit to `output_file`, or to standa
 
 `defline`, `sequence` and `label`. The label defaults to the first word of the defline after `>`; it is empty if the defline has no text.
 
+### SearchHit
+
+Returned by `find_hits`. Fields `seq_label`, `start`, `end` (1-based, inclusive) and `sts`; properties `sts_id`, `alias`, `strand` and `size`; `format()` returns the output line.
+
 ### STSHit
 
-`pos1`, `pos2` (0-based, inclusive, relative to the sequence) and the matching `STSRecord`.
+Internal representation with 0-based positions `pos1`, `pos2` and the matching `STSRecord`.
 
 ## Lower-level functions
 
@@ -82,6 +90,8 @@ if not engine.load_sts_file("markers.sts"):
     raise SystemExit("could not read markers.sts")
 
 records = engine.load_fasta_file("assembly.fa")
-n = engine.search(records, output_file="hits.txt")
-print(f"{n} hits in {len(records)} sequences")
+for hit in engine.find_hits(records):
+    print(hit.seq_label, hit.start, hit.end, hit.sts_id, hit.strand, hit.size)
+
+n = engine.search(records, output_file="hits.txt")  # same hits, written as text
 ```

@@ -130,7 +130,9 @@ class TestCLI(unittest.TestCase):
         )
 
         self.assertEqual(result.returncode, 0)
-        self.assertIn("1.0.0", result.stdout)
+        from merpcr import __version__
+
+        self.assertIn(__version__, result.stdout)
 
     def test_missing_files(self):
         """Test error handling for missing files."""

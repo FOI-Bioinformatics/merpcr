@@ -52,11 +52,48 @@ class FASTARecord:
 
 @dataclass
 class STSHit:
-    """Class representing an STS hit in a sequence."""
+    """An STS hit within one sequence (0-based inclusive positions)."""
 
     pos1: int
     pos2: int
     sts: STSRecord
+
+
+@dataclass
+class SearchHit:
+    """
+    A reported hit, as returned by MerPCR.find_hits.
+
+    Positions are 1-based and inclusive, as in the text output. format()
+    returns the corresponding output line without the trailing newline.
+    """
+
+    seq_label: str
+    start: int
+    end: int
+    sts: STSRecord
+
+    @property
+    def sts_id(self) -> str:
+        return self.sts.id
+
+    @property
+    def alias(self) -> Optional[str]:
+        return self.sts.alias
+
+    @property
+    def strand(self) -> str:
+        return self.sts.direct
+
+    @property
+    def size(self) -> int:
+        """Product size in bp."""
+        return self.end - self.start + 1
+
+    def format(self) -> str:
+        """Return the me-PCR output line for this hit."""
+        alias_field = "" if self.sts.alias is None else f"\t{self.sts.alias}"
+        return f"{self.seq_label}\t{self.start}..{self.end}\t{self.sts.id}{alias_field}\t({self.sts.direct})"
 
 
 @dataclass

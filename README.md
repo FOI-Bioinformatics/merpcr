@@ -57,7 +57,8 @@ from merpcr import MerPCR
 engine = MerPCR(margin=50, mismatches=1, threads=4)
 engine.load_sts_file("primers.sts")
 records = engine.load_fasta_file("genome.fa")
-hits = engine.search(records, output_file="hits.txt")
+hits = engine.find_hits(records)          # list of SearchHit objects
+engine.search(records, output_file="hits.txt")  # or write the text output
 ```
 
 See the [API reference](docs/API.md).
