@@ -8,8 +8,8 @@ me-PCR 1.0.6 (Murphy, Children's Hospital of Philadelphia), compiled from the di
 
 ## Methods
 
-1. The me-PCR test data (`test/test.sts`, `test/test.fa`) and the parameter variations in `test_compatibility.py`.
-2. Forty-two Francisellaceae genome assemblies (about 90 Mb in total) with a shared primer set, compared line by line under several parameter settings (`validate_real_data.py`; the data are not part of the repository).
+1. The me-PCR test data (`test/test.sts`, `test/test.fa`) and the parameter variations in `scripts/test_compatibility.py`.
+2. Forty-two Francisellaceae genome assemblies (about 90 Mb in total) with a shared primer set, compared line by line under several parameter settings (`scripts/validate_real_data.py`; the data are not part of the repository).
 3. Differential testing with `scripts/compare_with_mepcr.py`: random genomes of 3 kb to 400 kb with planted primer pairs in both orientations, with and without mismatches, IUPAC codes in primers, N blocks, lower-case input, multi-record files and every form of the annotation column, searched under random `M`, `N`, `W`, `X`, `T`, `Z` and `I` values. Standard output and exit codes are compared byte for byte. At the time of writing, 140 of 140 cases over three seeds (1849 hits) were identical for both the Cython and the pure-Python code path.
 4. Regression tests in `tests/test_mepcr_fidelity.py` for every behavior listed below, with expected values taken from the binary.
 

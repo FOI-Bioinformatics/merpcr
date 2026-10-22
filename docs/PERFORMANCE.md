@@ -30,7 +30,7 @@ Single worker, default parameters, Apple M-series laptop, wall-clock time for th
 
 The ratio grows with sequence length because process start-up and file parsing are a fixed cost. Run time is dominated by the scan and scales linearly with sequence length; the number of markers has little influence until hash collisions become frequent.
 
-`benchmark_cython.py` reproduces the comparison by running merPCR with and without the extension on a set of genomes; its data paths must be edited for a different machine.
+`scripts/benchmark_cython.py` reproduces the comparison by running merPCR with and without the extension on a set of genomes; its data paths must be edited for a different machine.
 
 ## Multiple workers
 

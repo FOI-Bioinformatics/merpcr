@@ -21,7 +21,8 @@ class TestCLI(unittest.TestCase):
 
     def setUp(self):
         """Set up test environment."""
-        self.script_path = Path(__file__).parent.parent / "scripts" / "merpcr"
+        # Run the module entry point, the same code path as the merpcr command
+        self.cmd = [sys.executable, "-m", "merpcr"]
         self.data_dir = Path(__file__).parent / "data"
         self.sts_file = self.data_dir / "test.sts"
         self.fasta_file = self.data_dir / "test.fa"
@@ -33,7 +34,7 @@ class TestCLI(unittest.TestCase):
     def test_basic_cli_execution(self):
         """Test basic CLI execution."""
         result = subprocess.run(
-            [str(self.script_path), str(self.sts_file), str(self.fasta_file)],
+            [*self.cmd, str(self.sts_file), str(self.fasta_file)],
             capture_output=True,
             text=True,
         )
@@ -45,7 +46,7 @@ class TestCLI(unittest.TestCase):
     def test_verbose_output(self):
         """Test verbose output mode."""
         result = subprocess.run(
-            [str(self.script_path), "-Q", "0", str(self.sts_file), str(self.fasta_file)],
+            [*self.cmd, "-Q", "0", str(self.sts_file), str(self.fasta_file)],
             capture_output=True,
             text=True,
         )
@@ -63,7 +64,7 @@ class TestCLI(unittest.TestCase):
         try:
             result = subprocess.run(
                 [
-                    str(self.script_path),
+                    *self.cmd,
                     "-O",
                     output_file,
                     str(self.sts_file),
@@ -90,7 +91,7 @@ class TestCLI(unittest.TestCase):
         """Test parameter parsing."""
         result = subprocess.run(
             [
-                str(self.script_path),
+                *self.cmd,
                 "-M",
                 "100",  # margin
                 "-N",
@@ -116,7 +117,7 @@ class TestCLI(unittest.TestCase):
 
     def test_help_message(self):
         """Test help message."""
-        result = subprocess.run([str(self.script_path), "--help"], capture_output=True, text=True)
+        result = subprocess.run([*self.cmd, "--help"], capture_output=True, text=True)
 
         self.assertEqual(result.returncode, 0)
         self.assertIn("merPCR", result.stdout)
@@ -125,9 +126,7 @@ class TestCLI(unittest.TestCase):
 
     def test_version_message(self):
         """Test version message."""
-        result = subprocess.run(
-            [str(self.script_path), "--version"], capture_output=True, text=True
-        )
+        result = subprocess.run([*self.cmd, "--version"], capture_output=True, text=True)
 
         self.assertEqual(result.returncode, 0)
         from merpcr import __version__
@@ -137,7 +136,7 @@ class TestCLI(unittest.TestCase):
     def test_missing_files(self):
         """Test error handling for missing files."""
         result = subprocess.run(
-            [str(self.script_path), "/nonexistent/sts.txt", "/nonexistent/fasta.fa"],
+            [*self.cmd, "/nonexistent/sts.txt", "/nonexistent/fasta.fa"],
             capture_output=True,
             text=True,
         )
@@ -147,7 +146,7 @@ class TestCLI(unittest.TestCase):
     def test_debug_mode(self):
         """Test debug mode."""
         result = subprocess.run(
-            [str(self.script_path), "--debug", str(self.sts_file), str(self.fasta_file)],
+            [*self.cmd, "--debug", str(self.sts_file), str(self.fasta_file)],
             capture_output=True,
             text=True,
         )

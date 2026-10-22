@@ -68,7 +68,7 @@ Full details: [docs/VERIFICATION.md](docs/VERIFICATION.md). Documentation files:
 - `make upload` - Upload to PyPI
 
 ### Compatibility Testing
-- `python test_compatibility.py` - Verify me-PCR output compatibility
+- `python scripts/test_compatibility.py` - Verify me-PCR output compatibility on the me-PCR test data (needs a local me-PCR binary)
 - `python scripts/compare_with_mepcr.py --mepcr /path/to/me-PCR -n 50` - Differential fuzzing against the me-PCR binary (add `--pure-python` to test the fallback path)
 - Deliberate deviations from me-PCR 1.0.6: size ranges and "-" are accepted (the binary rejects them); STS lines after a comment are reported correctly (the binary misreports them)
 - Test both argument formats: `-M 50` and `M=50`

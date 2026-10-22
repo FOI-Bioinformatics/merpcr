@@ -1,4 +1,4 @@
-.PHONY: test coverage lint format clean install dev-install build upload help
+.PHONY: test test-unit test-integration test-performance coverage lint format clean install dev-install build compare upload help
 
 help:
 	@echo "Available targets:"
@@ -14,6 +14,7 @@ help:
 	@echo "  dev-install   - Install package in development mode"
 	@echo "  build         - Build distribution packages"
 	@echo "  upload        - Upload to PyPI (requires authentication)"
+	@echo "  compare       - Differential test against a me-PCR binary (MEPCR=/path/to/me-PCR)"
 
 test:
 	pytest
@@ -25,7 +26,7 @@ test-integration:
 	pytest -m integration
 
 test-performance:
-	SKIP_PERFORMANCE_TESTS= pytest tests/test_performance.py -v
+	pytest tests/test_performance.py -v
 
 coverage:
 	coverage run -m pytest
@@ -43,15 +44,10 @@ format:
 	isort src/ tests/
 
 clean:
-	rm -rf build/
-	rm -rf dist/
-	rm -rf *.egg-info/
-	rm -rf .tox/
-	rm -rf htmlcov/
-	rm -rf .coverage
-	rm -rf coverage.xml
+	rm -rf build/ dist/ .tox/ htmlcov/ .pytest_cache/ .hypothesis/ .benchmarks/
+	rm -f .coverage .coverage.* coverage.xml output.txt stdout
 	find . -type d -name __pycache__ -exec rm -rf {} +
-	find . -type f -name "*.pyc" -delete
+	find . -type f \( -name "*.pyc" -o -name ".DS_Store" \) -delete
 
 install:
 	pip install .
@@ -61,6 +57,9 @@ dev-install:
 
 build: clean
 	python -m build
+
+compare:
+	python scripts/compare_with_mepcr.py --mepcr $(MEPCR) -n 50
 
 upload: build
 	python -m twine upload dist/*
