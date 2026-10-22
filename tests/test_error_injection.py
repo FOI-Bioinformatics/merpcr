@@ -80,7 +80,9 @@ class TestFileSystemErrorInjection:
             # Mock file opening to fail for output
             with patch("builtins.open", side_effect=OSError("Disk full")):
                 try:
-                    hits = engine.search(records, "output.txt")
+                    hits = engine.search(
+                        records, os.path.join(tempfile.gettempdir(), "merpcr_test_output.txt")
+                    )
                     # Should either handle gracefully or raise appropriate error
                 except OSError:
                     # This is acceptable
@@ -148,7 +150,9 @@ class TestFileSystemErrorInjection:
 
             with patch("builtins.print", side_effect=failing_print):
                 try:
-                    hits = engine.search(records, "output.txt")
+                    hits = engine.search(
+                        records, os.path.join(tempfile.gettempdir(), "merpcr_test_output.txt")
+                    )
                 except OSError as e:
                     assert e.errno == errno.ENOSPC
 
