@@ -628,10 +628,44 @@ class MerPCR:
                     hits.append(hit)
 
             for hit in hits:
-                results.append(SearchHit(seq_label, hit.pos1 + 1, hit.pos2 + 1, hit.sts))
+                results.append(self._make_search_hit(seq_label, sequence, hit))
 
         self.hits = results
         return results
+
+    def _make_search_hit(self, seq_label: str, sequence: str, hit: STSHit) -> SearchHit:
+        """Build a SearchHit, counting the mismatches under both primers."""
+        sts = hit.sts
+        len1 = len(sts.primer1)
+        len2 = len(sts.primer2)
+        seq1 = sequence[hit.pos1 : hit.pos1 + len1].upper()
+        seq2 = sequence[hit.pos2 + 1 - len2 : hit.pos2 + 1].upper()
+        iupac_p1 = bool(self.iupac_mode and (sts.ambig_primer & PRIMER1))
+        iupac_p2 = bool(self.iupac_mode and (sts.ambig_primer & PRIMER2))
+        return SearchHit(
+            seq_label,
+            hit.pos1 + 1,
+            hit.pos2 + 1,
+            sts,
+            mismatches1=self._count_mismatches(seq1, sts.primer1, iupac_p1),
+            mismatches2=self._count_mismatches(seq2, sts.primer2, iupac_p2),
+            seq1=seq1,
+            seq2=seq2,
+        )
+
+    def _count_mismatches(self, window: str, primer: str, iupac: bool) -> int:
+        """Count positions where the sequence window does not match the primer."""
+        count = 0
+        for c1, c2 in zip(window, primer):
+            if iupac:
+                o1 = ord(c1)
+                o2 = ord(c2.upper())
+                match = o1 < 256 and o2 < 256 and bool(self.iupac_match_matrix[o1, o2])
+            else:
+                match = c1 == c2.upper()
+            if not match:
+                count += 1
+        return count + abs(len(window) - len(primer))
 
     def _process_thread(self, thread_data: ThreadData) -> ThreadData:
         """Process a single thread's worth of sequence data."""

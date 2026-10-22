@@ -66,12 +66,28 @@ class SearchHit:
 
     Positions are 1-based and inclusive, as in the text output. format()
     returns the corresponding output line without the trailing newline.
+
+    mismatches1 and mismatches2 are the numbers of mismatching positions
+    between each primer and the sequence, counted with the same rule the
+    search used (exact comparison, or IUPAC expansion for primers that
+    contain ambiguity codes in IUPAC mode). seq1 and seq2 are the matched
+    sequence windows on the reported strand: seq1 under the first primer of
+    the record and seq2 under the reverse complement of the second primer.
     """
 
     seq_label: str
     start: int
     end: int
     sts: STSRecord
+    mismatches1: int = 0
+    mismatches2: int = 0
+    seq1: str = ""
+    seq2: str = ""
+
+    @property
+    def mismatches(self) -> int:
+        """Total number of mismatches in both primers."""
+        return self.mismatches1 + self.mismatches2
 
     @property
     def sts_id(self) -> str:

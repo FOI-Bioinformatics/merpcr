@@ -63,7 +63,9 @@ Calls `find_hits` and writes one line per hit to `output_file`, or to standard o
 
 ### SearchHit
 
-Returned by `find_hits`. Fields `seq_label`, `start`, `end` (1-based, inclusive) and `sts`; properties `sts_id`, `alias`, `strand` and `size`; `format()` returns the output line.
+Returned by `find_hits`. Fields `seq_label`, `start`, `end` (1-based, inclusive), `sts`, `mismatches1`, `mismatches2`, `seq1` and `seq2`; properties `sts_id`, `alias`, `strand`, `size` and `mismatches` (the sum); `format()` returns the output line.
+
+`mismatches1` and `mismatches2` count the positions at which each primer differs from the sequence, using the rule the search applied: exact comparison, or IUPAC expansion of primer codes in IUPAC mode. `seq1` and `seq2` are the matched windows on the reported strand, under the record's first primer and under the reverse complement of its second primer. Both counts are 0 for every hit when `mismatches=0`.
 
 ### STSHit
 
@@ -93,7 +95,7 @@ if not engine.load_sts_file("markers.sts"):
 
 records = engine.load_fasta_file("assembly.fa")
 for hit in engine.find_hits(records):
-    print(hit.seq_label, hit.start, hit.end, hit.sts_id, hit.strand, hit.size)
+    print(hit.seq_label, hit.start, hit.end, hit.sts_id, hit.strand, hit.size, hit.mismatches)
 
 n = engine.search(records, output_file="hits.txt")  # same hits, written as text
 ```

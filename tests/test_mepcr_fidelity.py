@@ -309,3 +309,47 @@ class TestCompressedInput:
         engine = MerPCR()
         engine.load_fasta_file(fa)
         assert engine._fasta_file_size == os.path.getsize(fa)
+
+
+class TestMismatchCounts:
+    def _hits(self, tmp, sts_text, seq, **kwargs):
+        sts = write(os.path.join(tmp, "m.sts"), sts_text)
+        fa = write(os.path.join(tmp, "m.fa"), ">s\n" + seq + "\n")
+        engine = MerPCR(**kwargs)
+        assert engine.load_sts_file(sts)
+        return engine.find_hits(engine.load_fasta_file(fa))
+
+    def test_exact_hit_has_zero_mismatches_and_windows(self, tmpdir_path):
+        hits = self._hits(tmpdir_path, f"S1\t{P1}\t{P2}\t200\n", planted_sequence())
+        (hit,) = hits
+        assert (hit.mismatches1, hit.mismatches2, hit.mismatches) == (0, 0, 0)
+        assert hit.seq1 == P1 and hit.seq2 == rc(P2)
+
+    def test_mismatch_in_each_primer_is_counted(self, tmpdir_path):
+        seq = list(planted_sequence())
+        seq[105] = "A" if seq[105] != "A" else "C"  # inside primer 1 (positions 100..119)
+        seq[285] = "A" if seq[285] != "A" else "C"  # inside primer 2 window (280..299)
+        hits = self._hits(tmpdir_path, f"S1\t{P1}\t{P2}\t200\n", "".join(seq), mismatches=1)
+        (hit,) = hits
+        assert (hit.mismatches1, hit.mismatches2, hit.mismatches) == (1, 1, 2)
+        assert hit.seq1 != P1 and hit.seq2 != rc(P2)
+
+    def test_iupac_code_in_primer_is_not_a_mismatch(self, tmpdir_path):
+        p1n = P1[:5] + "N" + P1[6:]
+        hits = self._hits(tmpdir_path, f"S1\t{p1n}\t{P2}\t200\n", planted_sequence(), iupac_mode=1)
+        (hit,) = hits
+        assert hit.mismatches == 0
+        assert hit.seq1 == P1
+
+    def test_reverse_strand_hit_counts_against_its_own_record(self, tmpdir_path):
+        # Listing the primers as P2, P1 makes the planted product a "-" strand hit.
+        # The "-" record has primer1 = P1 and primer2 = rc(P2), both on the given
+        # strand, so a mutation under P1 is counted in mismatches1.
+        seq = list(planted_sequence())
+        seq[105] = "A" if seq[105] != "A" else "C"  # under P1, outside its hash word
+        hits = self._hits(tmpdir_path, f"S1\t{P2}\t{P1}\t200\n", "".join(seq), mismatches=1)
+        (hit,) = hits
+        assert hit.strand == "-"
+        assert hit.sts.primer1 == P1 and hit.sts.primer2 == rc(P2)
+        assert (hit.mismatches1, hit.mismatches2) == (1, 0)
+        assert hit.seq2 == rc(P2)
