@@ -10,9 +10,9 @@ from typing import List
 from . import __version__
 from .core.engine import (
     DEFAULT_IUPAC_MODE,
-    DEFAULT_ONE_SIDED,
     DEFAULT_MARGIN,
     DEFAULT_MISMATCHES,
+    DEFAULT_ONE_SIDED,
     DEFAULT_PCR_SIZE,
     DEFAULT_THREADS,
     DEFAULT_THREE_PRIME_MATCH,
