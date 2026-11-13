@@ -25,6 +25,27 @@ AFM248yg9	GCTAAAAATACACGGATGG	TGCAAGACTGCGTCTC	193	(D17S932) Chr.17, 63.7 cM
 - The annotation is everything after the fourth tab, including further tabs, and is reproduced verbatim in the output.
 - Lines starting with `#` and blank lines are ignored. Lines longer than the `-S` limit (1022 characters by default) are an error, as in me-PCR.
 
+#### Markers with an internal probe
+
+With `--probe-column` the fifth column is read as an internal probe, for example the hydrolysis probe of a real-time PCR assay, and the annotation starts at the sixth column:
+
+```
+identifier<TAB>forward primer<TAB>reverse primer<TAB>product size[<TAB>probe[<TAB>annotation]]
+```
+
+```
+assay1	GATTACAGGCTAGCTTAC	CCATGGTTAGCAATCGGA	76	TTGACCGATAGGCATCCAGT	with probe
+assay2	GAATGAACAGAGATGATGCCT	CACACACACACACACCACAC	142	-	no probe
+```
+
+- The probe is given 5' to 3' on either strand. `-` or an empty field means that the marker has no probe; such a marker is treated exactly as without the option.
+- The primer pair is searched as usual. For each amplicon found, the probe and its reverse complement are compared with the amplicon. A probe site must lie inside the amplicon and must not overlap the primer that anneals to the same strand; overlap with the other primer is accepted. This is the placement rule used by ThermonucleotideBLAST.
+- Up to `--probe-mismatches` mismatches are allowed in the probe (default 0), independently of `-N`, and there is no 3' rule for the probe. IUPAC codes in a probe are always interpreted, also without `-I 1`. As for primers, an ambiguity code in the sequence counts as a mismatch.
+- When several sites qualify, the one with the fewest mismatches is reported; ties go to the site matching the probe as written and then to the leftmost site.
+- Amplicons without a probe site are not reported, unless `--keep-probeless` is set.
+- The comparison is by sequence only. Melting temperature, insertions and deletions are not considered.
+- This layout is an extension of the me-PCR format. Without `--probe-column`, a fifth column is part of the annotation, as in me-PCR.
+
 ### FASTA file
 
 Standard FASTA with one or more records. Files ending in `.gz`, `.bz2`, `.xz` or `.lzma` are decompressed while reading; the same applies to the STS file. The sequence label is the text between `>` and the first space or tab. Sequence lines are upper-cased and filtered with the me-PCR nucleotide alphabet `GATCNBDHKMRSVWY-`: other characters, including `X` and `U`, are removed, while the gap character `-` is kept and occupies a position.
@@ -38,6 +59,14 @@ label<TAB>start..end<TAB>identifier[<TAB>annotation]<TAB>(strand)
 ```
 
 Positions are 1-based and inclusive and span the whole product from the first base of one primer to the last base of the other. The annotation column is present only if the STS line had one. The strand is `(+)` when the forward primer matches the given strand and the reverse primer matches the opposite strand, and `(-)` for the reverse arrangement.
+
+For a marker with a probe (`--probe-column`), two fields are appended:
+
+```
+label<TAB>start..end<TAB>identifier[<TAB>annotation]<TAB>(strand)<TAB>probe=start..end(strand)<TAB>mm=count
+```
+
+The probe positions are 1-based and refer to the given sequence. The probe strand is `(+)` when the probe as written matches the given strand and `(-)` when its reverse complement does; it is independent of the strand of the marker. `mm` is the number of mismatches in the probe. With `--keep-probeless`, an amplicon without a probe site ends in the single field `probe=none`. Lines of markers without a probe are not changed.
 
 Hits are reported per sequence in the order the scan finds them. Because the scan triggers on the 3'-most word of a primer, a marker with a shorter primer can be reported before a marker that starts earlier, and markers sharing a hash word are checked most-recent-first. This matches me-PCR; sort the output by position if a positional order is needed.
 
@@ -55,9 +84,13 @@ Hits are reported per sequence in the order the scan finds them. Because the sca
 | `-S`, `--max-sts-line-length` | 1022 | 1 or more | Maximum length of an STS line |
 | `-O`, `--output` | stdout | | Output file |
 | `-Q`, `--quiet` | 1 | 0 or 1 | 0 prints progress and statistics to stderr |
+| `-U`, `--one-sided` | 0 | 0 or 1 | Search markers whose forward primer has no hash word on one strand |
+| `--probe-column` | off | | Read column 5 of the STS file as an internal probe |
+| `--probe-mismatches` | 0 | 0 to 10 | Mismatches allowed in a probe |
+| `--keep-probeless` | off | | Report amplicons of markers with a probe also when no probe site is found |
 | `--debug` | | | Debug logging |
 
-Every option can also be written in the me-PCR form `M=50`, and the legacy `-margin 50` is accepted.
+Every single-letter option can also be written in the me-PCR form `M=50`, and the legacy `-margin 50` is accepted. The probe options have a long form only.
 
 ### Choosing parameters
 
@@ -88,6 +121,7 @@ Differences that may be noticed:
 - Size ranges and `-` in the size column are accepted. me-PCR 1.0.6 exits with a format error for both.
 - Markers that follow a comment line are reported correctly. me-PCR 1.0.6 reads the wrong line when reporting them.
 - Threads are worker processes. Results do not depend on `-T`.
+- The probe options (`--probe-column` and related) are an addition. They are off by default and do not change the output for markers without a probe.
 
 To verify equivalence on your own data, run both programs and compare the outputs with `diff`, or use `scripts/compare_with_mepcr.py` for a randomized comparison.
 

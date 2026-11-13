@@ -25,6 +25,7 @@ class STSLoader:
         iupac_mode: int = 0,
         max_sts_line_length: int = 1022,
         one_sided: int = 0,
+        probe_column: bool = False,
     ):
         """Initialize STS loader with parameters."""
         self.wordsize = wordsize
@@ -33,6 +34,7 @@ class STSLoader:
         self.iupac_mode = iupac_mode
         self.max_sts_line_length = max_sts_line_length
         self.one_sided = one_sided
+        self.probe_column = probe_column
 
     def load_file(self, filename: str) -> tuple[List[STSRecord], Dict[int, List[STSRecord]], int]:
         """
@@ -54,6 +56,7 @@ class STSLoader:
             default_pcr_size=self.default_pcr_size,
             max_sts_line_length=self.max_sts_line_length,
             one_sided=self.one_sided,
+            probe_column=self.probe_column,
         )
         if not engine.load_sts_file(filename):
             return [], {}, 0

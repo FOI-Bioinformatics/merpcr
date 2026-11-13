@@ -30,6 +30,8 @@ class STSRecord:
     direct: str = "+"  # Orientation: '+' for forward, '-' for reverse
     ambig_primer: int = 0  # Flags indicating which primers have ambiguities
     margin: int = 0  # Per-STS margin (may be adjusted for PCR size ranges)
+    # Optional internal probe, as written in the STS file (see MerPCR probe_column)
+    probe: Optional[str] = None
 
 
 @dataclass
@@ -73,6 +75,14 @@ class SearchHit:
     contain ambiguity codes in IUPAC mode). seq1 and seq2 are the matched
     sequence windows on the reported strand: seq1 under the first primer of
     the record and seq2 under the reverse complement of the second primer.
+
+    The probe fields are only filled for markers that carry a probe (see the
+    probe_column option of MerPCR). probe_start and probe_end are 1-based
+    positions of the probe site in the sequence, probe_strand is "+" when the
+    probe as written matches the given sequence and "-" when its reverse
+    complement does, probe_mismatches is the number of mismatching positions
+    and probe_seq is the sequence window under the probe. They are None (or
+    empty) when the marker has no probe or no probe site was found.
     """
 
     seq_label: str
@@ -83,6 +93,11 @@ class SearchHit:
     mismatches2: int = 0
     seq1: str = ""
     seq2: str = ""
+    probe_start: Optional[int] = None
+    probe_end: Optional[int] = None
+    probe_strand: Optional[str] = None
+    probe_mismatches: Optional[int] = None
+    probe_seq: str = ""
 
     @property
     def mismatches(self) -> int:
@@ -106,10 +121,32 @@ class SearchHit:
         """Product size in bp."""
         return self.end - self.start + 1
 
+    @property
+    def probe_found(self) -> bool:
+        """True when the marker has a probe and a probe site was found."""
+        return self.probe_start is not None
+
     def format(self) -> str:
-        """Return the me-PCR output line for this hit."""
+        """
+        Return the output line for this hit.
+
+        For a marker without a probe this is the me-PCR output line. For a
+        marker with a probe two tab-separated fields are appended, the probe
+        site and its mismatch count, or "probe=none" when no site was found.
+        """
         alias_field = "" if self.sts.alias is None else f"\t{self.sts.alias}"
-        return f"{self.seq_label}\t{self.start}..{self.end}\t{self.sts.id}{alias_field}\t({self.sts.direct})"
+        line = (
+            f"{self.seq_label}\t{self.start}..{self.end}\t{self.sts.id}{alias_field}"
+            f"\t({self.sts.direct})"
+        )
+        if not self.sts.probe:
+            return line
+        if not self.probe_found:
+            return f"{line}\tprobe=none"
+        return (
+            f"{line}\tprobe={self.probe_start}..{self.probe_end}({self.probe_strand})"
+            f"\tmm={self.probe_mismatches}"
+        )
 
 
 @dataclass

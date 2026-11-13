@@ -2,6 +2,28 @@
 
 This document records significant modifications and enhancements to the merPCR software package following semantic versioning principles.
 
+## [1.1.0] - Optional internal probe
+
+- New option `--probe-column` (`MerPCR(probe_column=True)`): the fifth
+  column of the STS file is read as an internal (hydrolysis) probe and the
+  annotation starts at the sixth column. `-` or an empty field means that the
+  marker has no probe. A hit of a marker with a probe is reported only when
+  the probe, or its reverse complement, matches inside the amplicon without
+  overlapping the primer that anneals to the same strand.
+- `--probe-mismatches N` (`probe_mismatches`, default 0) sets the number of
+  mismatches allowed in the probe independently of `-N`. Ambiguity codes in
+  a probe are always interpreted. `--keep-probeless` (`require_probe=False`)
+  also reports amplicons in which no probe site was found.
+- Output lines of markers with a probe carry two additional fields,
+  `probe=start..end(strand)` and `mm=count`, or `probe=none`. `SearchHit`
+  gains `probe_start`, `probe_end`, `probe_strand`, `probe_mismatches`,
+  `probe_seq` and `probe_found`.
+- The probe check is not part of me-PCR. Without `--probe-column` the STS
+  file is parsed as before, and lines of markers without a probe keep the
+  me-PCR format in every case.
+- Fixed: the me-PCR form `U=1` of the one-sided option was not converted and
+  was taken as a file name; `-U 1` was not affected.
+
 ## [1.0.5] - Mismatch counts on hits
 
 - `SearchHit` gains `mismatches1`, `mismatches2` (and the sum `mismatches`)

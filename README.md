@@ -38,6 +38,10 @@ merpcr primers.sts genome.fa -O hits.txt        # write results to a file
 | `-S` | `S=` | 1022 | Maximum STS line length |
 | `-O` | `O=` | stdout | Output file |
 | `-Q` | `Q=` | 1 | 0 prints progress messages, 1 is quiet |
+| `-U` | `U=` | 0 | 1 searches markers whose forward primer has no hash word on one strand |
+| `--probe-column` | | off | Read column 5 of the STS file as an internal probe (annotation from column 6) |
+| `--probe-mismatches` | | 0 | Mismatches allowed in a probe |
+| `--keep-probeless` | | off | Also report amplicons in which no probe site is found |
 
 The STS file is tab-delimited with the fields identifier, forward primer, reverse primer, expected product size and an optional annotation. Both input files may be compressed with gzip, bzip2 or xz. The output has one line per hit:
 
@@ -45,7 +49,9 @@ The STS file is tab-delimited with the fields identifier, forward primer, revers
 L78833	75823..76023	AFM248yg9	(D17S932)  Chr.17, 63.7 cM	(-)
 ```
 
-The fields are sequence label, 1-based start and end of the product, STS identifier, the annotation when present, and the strand. The [user guide](docs/USER_GUIDE.md) describes the file formats, the parameters and the search algorithm in detail.
+The fields are sequence label, 1-based start and end of the product, STS identifier, the annotation when present, and the strand.
+
+As an extension of the me-PCR format, a marker can carry an internal probe (for example a hydrolysis probe) in a fifth column when `--probe-column` is given. A hit is then reported only if the probe also matches inside the amplicon, and its line ends with the probe site and mismatch count, such as `probe=129..148(+)	mm=0`. Lines of markers without a probe are not changed. The [user guide](docs/USER_GUIDE.md) describes the file formats, the parameters and the search algorithm in detail.
 
 ### Python API
 
