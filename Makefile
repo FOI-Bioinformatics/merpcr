@@ -1,4 +1,4 @@
-.PHONY: test test-unit test-integration test-performance coverage lint format clean install dev-install build compare upload help
+.PHONY: test test-unit test-integration test-performance coverage lint format clean install dev-install build compare help
 
 help:
 	@echo "Available targets:"
@@ -13,7 +13,6 @@ help:
 	@echo "  install       - Install package"
 	@echo "  dev-install   - Install package in development mode"
 	@echo "  build         - Build distribution packages"
-	@echo "  upload        - Upload to PyPI (requires authentication)"
 	@echo "  compare       - Differential test against a me-PCR binary (MEPCR=/path/to/me-PCR)"
 
 test:
@@ -60,6 +59,3 @@ build: clean
 
 compare:
 	python scripts/compare_with_mepcr.py --mepcr $(MEPCR) -n 50
-
-upload: build
-	python -m twine upload dist/*
