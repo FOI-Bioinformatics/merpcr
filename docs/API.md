@@ -19,6 +19,9 @@ MerPCR(
     default_pcr_size=240,   # size for markers given as 0 or "-", 1 to 10000
     threads=1,              # worker processes per sequence
     max_sts_line_length=1022,
+    probe_column=False,     # True reads column 5 of the STS file as an internal probe
+    probe_mismatches=0,     # mismatches allowed in a probe, 0 to 10
+    require_probe=True,     # False keeps amplicons of probe markers without a probe site
 )
 ```
 
@@ -34,7 +37,7 @@ Reads all records from a FASTA file, decompressing `.gz`, `.bz2`, `.xz` and `.lz
 
 ### find_hits(fasta_records) -> list[SearchHit]
 
-Searches every record and returns the hits in output order as `SearchHit` objects (see below). The list is also stored in `hits`.
+Searches every record and returns the hits in output order as `SearchHit` objects (see below). The list is also stored in `hits`. For markers with a probe, the probe is looked for inside each amplicon after the scan, and amplicons without a probe site are left out unless `require_probe=False`. The rules are described in the [user guide](USER_GUIDE.md#markers-with-an-internal-probe).
 
 ### search(fasta_records, output_file=None) -> int
 
@@ -50,12 +53,13 @@ Calls `find_hits` and writes one line per hit to `output_file`, or to standard o
 | `primer1` | str | Primer searched on the given strand |
 | `primer2` | str | Reverse complement of the partner primer, searched downstream |
 | `pcr_size` | int | Expected product size after range and minimum adjustments |
-| `alias` | str or None | Text after the fourth tab; `None` when the line had no fifth field |
+| `alias` | str or None | Text after the fourth tab (after the fifth with `probe_column=True`); `None` when the line had no such field |
 | `offset` | int | Line number in the STS file |
 | `hash_offset` | int | Position of the hash word within `primer1` |
 | `direct` | str | `"+"` or `"-"` |
 | `ambig_primer` | int | Bit 1: `primer1` contains IUPAC codes; bit 2: `primer2` does (set only in IUPAC mode) |
 | `margin` | int | Margin for this marker, including the range adjustment |
+| `probe` | str or None | Internal probe as written in the STS file (only with `probe_column=True`) |
 
 ### FASTARecord
 
@@ -67,6 +71,8 @@ Returned by `find_hits`. Fields `seq_label`, `start`, `end` (1-based, inclusive)
 
 `mismatches1` and `mismatches2` count the positions at which each primer differs from the sequence, using the rule the search applied: exact comparison, or IUPAC expansion of primer codes in IUPAC mode. `seq1` and `seq2` are the matched windows on the reported strand, under the record's first primer and under the reverse complement of its second primer. Both counts are 0 for every hit when `mismatches=0`.
 
+For a marker with a probe, `probe_start` and `probe_end` (1-based, inclusive) give the probe site in the sequence, `probe_strand` is `"+"` when the probe as written matches the given sequence and `"-"` when its reverse complement does, `probe_mismatches` is the number of mismatching positions and `probe_seq` is the sequence window under the probe. The property `probe_found` is true when a site was found. For markers without a probe, and for amplicons kept with `require_probe=False` in which no site was found, these fields are `None` (`probe_seq` is empty).
+
 ### STSHit
 
 Internal representation with 0-based positions `pos1`, `pos2` and the matching `STSRecord`.
@@ -77,7 +83,7 @@ Internal representation with 0-based positions `pos1`, `pos2` and the matching `
 - `merpcr.core.utils.reverse_complement(sequence)` handles IUPAC codes and maps unknown characters to `N`.
 - `merpcr.io.fasta.FASTALoader.load_file(filename)` is the FASTA reader used by `MerPCR`.
 - `merpcr.io.files.open_text(filename)` opens a plain or compressed file for text reading.
-- `merpcr.io.sts.STSLoader(wordsize, margin, default_pcr_size, iupac_mode=0).load_file(filename)` returns `(records, table, max_pcr_size)` using the engine's parser.
+- `merpcr.io.sts.STSLoader(wordsize, margin, default_pcr_size, iupac_mode=0, probe_column=False).load_file(filename)` returns `(records, table, max_pcr_size)` using the engine's parser.
 
 Methods of `MerPCR` whose names start with an underscore (`_hash_value`, `_compare_seqs`, `_match_sts`, `_process_thread`) implement the algorithm and may change between releases.
 

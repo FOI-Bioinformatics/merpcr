@@ -4,9 +4,9 @@ This file provides comprehensive guidance to Claude Code (claude.ai/code) when w
 
 ## System Status: PRODUCTION READY ✅
 
-- **Version**: 1.0.5
+- **Version**: 1.1.0
 - **Test Coverage**: **94% for engine.py** (critical component), comprehensive edge case testing
-- **Test Suite**: 277 comprehensive tests across 19 test files
+- **Test Suite**: 355 tests across 20 test files
 - **Architecture**: Modular, typed, thread-safe
 - **Compatibility**: me-PCR output compatibility verified on 42 real genomes and by differential fuzzing against the me-PCR 1.0.6 binary (scripts/compare_with_mepcr.py)
 - **Performance**: Optimized multithreading for large datasets
@@ -42,7 +42,7 @@ Full details: [docs/VERIFICATION.md](docs/VERIFICATION.md). Documentation files:
 ## Development Commands
 
 ### Core Testing
-- `make test` or `pytest` - Run all 277 tests
+- `make test` or `pytest` - Run all 355 tests
 - `make test-unit` - Unit tests only
 - `make test-integration` - Integration tests
 - `make test-performance` - Performance benchmarks
@@ -71,6 +71,7 @@ Full details: [docs/VERIFICATION.md](docs/VERIFICATION.md). Documentation files:
 - `python scripts/test_compatibility.py` - Verify me-PCR output compatibility on the me-PCR test data (needs a local me-PCR binary)
 - `python scripts/compare_with_mepcr.py --mepcr /path/to/me-PCR -n 50` - Differential fuzzing against the me-PCR binary (add `--pure-python` to test the fallback path)
 - Deliberate deviations from me-PCR 1.0.6: size ranges and "-" are accepted (the binary rejects them); STS lines after a comment are reported correctly (the binary misreports them)
+- Optional probe check (`--probe-column`, `--probe-mismatches`, `--keep-probeless`; tests/test_probe_support.py) is not part of me-PCR. It runs in `find_hits` after the scan, so `engine_fast.pyx` is not involved, and it is off by default: without `--probe-column` parsing and output are unchanged
 - Test both argument formats: `-M 50` and `M=50`
 
 ## Production Architecture

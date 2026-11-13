@@ -46,6 +46,10 @@ DEFAULT_IUPAC_MODE = 0
 DEFAULT_ONE_SIDED = 0
 DEFAULT_THREADS = 1
 DEFAULT_PCR_SIZE = 240
+DEFAULT_PROBE_MISMATCHES = 0
+
+# Characters accepted in a probe sequence
+PROBE_ALPHABET = frozenset("ACGTURYMKSWBDHVN")
 
 # Parameter bounds
 MIN_WORDSIZE = 3
@@ -75,9 +79,25 @@ class MerPCR:
         threads: int = DEFAULT_THREADS,
         max_sts_line_length: int = 1022,
         one_sided: int = DEFAULT_ONE_SIDED,
+        probe_column: bool = False,
+        probe_mismatches: int = DEFAULT_PROBE_MISMATCHES,
+        require_probe: bool = True,
     ):
-        """Initialize the MerPCR class with search parameters."""
+        """
+        Initialize the MerPCR class with search parameters.
+
+        probe_column, probe_mismatches and require_probe control the optional
+        probe check, which is not part of me-PCR. With probe_column set, the
+        fifth column of the STS file is read as an internal probe and the
+        alias starts at the sixth column. A hit of a marker with a probe is
+        reported only when the probe matches inside the amplicon with at most
+        probe_mismatches mismatches, unless require_probe is False, in which
+        case such hits are kept and marked as having no probe site.
+        """
         self.wordsize = wordsize
+        self.probe_column = bool(probe_column)
+        self.probe_mismatches = probe_mismatches
+        self.require_probe = bool(require_probe)
         self.one_sided = one_sided
         self.margin = margin
         self.mismatches = mismatches
@@ -120,6 +140,11 @@ class MerPCR:
 
         if not (MIN_PCR_SIZE <= self.default_pcr_size <= MAX_PCR_SIZE):
             raise ValueError(f"Default PCR size must be between {MIN_PCR_SIZE} and {MAX_PCR_SIZE}")
+
+        if not (MIN_MISMATCHES <= self.probe_mismatches <= MAX_MISMATCHES):
+            raise ValueError(
+                f"Number of probe mismatches must be between {MIN_MISMATCHES} and {MAX_MISMATCHES}"
+            )
 
     def _init_lookup_tables(self):
         """Initialize lookup tables for sequence processing."""
@@ -202,13 +227,19 @@ class MerPCR:
         # sequence bases it expands to, but an ambiguity code in the sequence does
         # not match a plain primer base. The matrix is always allocated because the
         # Cython extension expects it; it is only consulted in IUPAC mode.
-        self.iupac_match_matrix = np.zeros((256, 256), dtype=np.uint8)
+        full_matrix = np.zeros((256, 256), dtype=np.uint8)
+        for primer_base, matches in self.iupac_mapping.items():
+            for seq_base in matches:
+                for pb in (primer_base.upper(), primer_base.lower()):
+                    for sb in (seq_base.upper(), seq_base.lower()):
+                        full_matrix[ord(sb), ord(pb)] = 1
         if self.iupac_mode:
-            for primer_base, matches in self.iupac_mapping.items():
-                for seq_base in matches:
-                    for pb in (primer_base.upper(), primer_base.lower()):
-                        for sb in (seq_base.upper(), seq_base.lower()):
-                            self.iupac_match_matrix[ord(sb), ord(pb)] = 1
+            self.iupac_match_matrix = full_matrix
+        else:
+            self.iupac_match_matrix = np.zeros((256, 256), dtype=np.uint8)
+        # Probes are not part of me-PCR; their ambiguity codes are always
+        # interpreted, with the same one-directional rule, whatever the IUPAC mode.
+        self.probe_match_matrix = full_matrix
 
         # Ambiguity detection lookup
         self.ambig = {}
@@ -238,6 +269,11 @@ class MerPCR:
         ("200-220") and "-" are accepted as documented in the me-PCR source,
         although that release rejects them, and comment lines do not disturb
         the reporting of the STS that follows them.
+
+        With probe_column set, the fifth field is an internal probe and the
+        alias is everything after the fifth tab. A probe of "-" or an empty
+        field means that the marker has no probe. This layout is not part of
+        me-PCR; without the option the fifth field belongs to the alias.
         """
         start_time = time.time()
         file_size = os.path.getsize(filename)
@@ -256,6 +292,7 @@ class MerPCR:
         bad_primers_ambig = 0
         bad_pcr_size = 0
         one_sided_markers = 0
+        long_probes = 0
 
         with open_text(filename) as file:
             for line_no, raw_line in enumerate(file.readlines(), start=1):
@@ -288,7 +325,18 @@ class MerPCR:
                 pcr_size, margin_adjustment = self._parse_pcr_size(fields[3])
 
                 # me-PCR reports the whole remainder of the line after the size field
-                alias = "\t".join(fields[4:]) if len(fields) > 4 else None
+                probe = None
+                if self.probe_column:
+                    if len(fields) > 4 and fields[4] not in ("", "-"):
+                        probe = fields[4].upper()
+                        if not set(probe) <= PROBE_ALPHABET:
+                            logger.error(
+                                f"Bad probe sequence at line {line_no} of the STS file: '{fields[4]}'"
+                            )
+                            return False
+                    alias = "\t".join(fields[5:]) if len(fields) > 5 else None
+                else:
+                    alias = "\t".join(fields[4:]) if len(fields) > 4 else None
 
                 # Margin to use for this STS (base margin + adjustment for ranges)
                 margin_to_use = self.margin + margin_adjustment
@@ -300,6 +348,9 @@ class MerPCR:
                 if len(primer1) < self.wordsize or len(primer2) < self.wordsize:
                     bad_primers_short += 1
                     continue
+
+                if probe is not None and len(probe) > pcr_size + margin_to_use:
+                    long_probes += 1
 
                 # Keep track of the maximum PCR size
                 if pcr_size > self.max_pcr_size:
@@ -345,6 +396,7 @@ class MerPCR:
                         direct="+",
                         ambig_primer=ambig_for,
                         margin=margin_to_use,
+                        probe=probe,
                     )
                     self._insert_sts(sts_for, hash_value1)
 
@@ -365,6 +417,7 @@ class MerPCR:
                     direct="-",
                     ambig_primer=ambig_rev,
                     margin=margin_to_use,
+                    probe=probe,
                 )
                 self._insert_sts(sts_rev, hash_value2)
 
@@ -382,6 +435,12 @@ class MerPCR:
         if one_sided_markers > 0:
             logger.warning(
                 f"{one_sided_markers} STSs are searched on one strand only because the other primer has no hash word"
+            )
+
+        if long_probes > 0:
+            logger.warning(
+                f"{long_probes} STSs have a probe longer than the largest allowed product: "
+                "no hits can be reported for them"
             )
 
         if bad_pcr_size > 0:
@@ -551,6 +610,10 @@ class MerPCR:
         the scan finds them. Hits lying in the leading overlap of a chunk
         other than the first are duplicates of the previous chunk and are
         dropped. Positions in the returned SearchHit objects are 1-based.
+
+        For a marker with a probe, the probe is looked for inside each
+        amplicon after the scan (see _find_probe). Amplicons without a probe
+        site are left out unless require_probe is False.
         """
         results: List[SearchHit] = []
 
@@ -628,7 +691,21 @@ class MerPCR:
                     hits.append(hit)
 
             for hit in hits:
-                results.append(self._make_search_hit(seq_label, sequence, hit))
+                search_hit = self._make_search_hit(seq_label, sequence, hit)
+                probe = hit.sts.probe
+                if probe:
+                    site = self._find_probe(sequence, hit)
+                    if site is None:
+                        if self.require_probe:
+                            continue
+                    else:
+                        start, strand, count = site
+                        search_hit.probe_start = start + 1
+                        search_hit.probe_end = start + len(probe)
+                        search_hit.probe_strand = strand
+                        search_hit.probe_mismatches = count
+                        search_hit.probe_seq = sequence[start : start + len(probe)].upper()
+                results.append(search_hit)
 
         self.hits = results
         return results
@@ -652,6 +729,55 @@ class MerPCR:
             seq1=seq1,
             seq2=seq2,
         )
+
+    def _find_probe(self, sequence: str, hit: STSHit) -> Optional[tuple[int, str, int]]:
+        """
+        Look for the probe of a marker inside one amplicon.
+
+        Both the probe as written (strand "+") and its reverse complement
+        (strand "-") are compared with every allowed position of the amplicon
+        on the given sequence. A probe site must lie inside the amplicon and
+        must not overlap the primer that anneals to the same strand, since
+        that primer could then not be extended through the probe: a "+" site
+        may not overlap the left primer site and a "-" site may not overlap
+        the right one. Overlap with the other primer site is accepted.
+
+        Mismatches are counted position by position, without a 3' rule.
+        Ambiguity codes in the probe match the bases they cover; an ambiguity
+        code in the sequence does not match. Returns (0-based start, strand,
+        mismatches) for the site with the fewest mismatches, preferring "+"
+        and then the leftmost site, or None when no site has at most
+        probe_mismatches mismatches.
+        """
+        sts = hit.sts
+        probe = (sts.probe or "").upper()
+        amplicon = sequence[hit.pos1 : hit.pos2 + 1].upper()
+        probe_len = len(probe)
+        amplicon_len = len(amplicon)
+        codes = np.frombuffer(amplicon.encode("ascii", "replace"), dtype=np.uint8)
+
+        candidates = (
+            ("+", probe, len(sts.primer1), amplicon_len - probe_len),
+            ("-", self._reverse_complement(probe), 0, amplicon_len - len(sts.primer2) - probe_len),
+        )
+        best: Optional[tuple[int, str, int]] = None
+        for strand, oligo, first, last in candidates:
+            if last < first:
+                continue
+            n_sites = last - first + 1
+            mismatches = np.zeros(n_sites, dtype=np.int32)
+            for j, base in enumerate(oligo):
+                column = ord(base)
+                if column < 256:
+                    window = codes[first + j : first + j + n_sites]
+                    mismatches += self.probe_match_matrix[window, column] == 0
+                else:
+                    mismatches += 1
+            index = int(np.argmin(mismatches))  # the first minimum is the leftmost site
+            count = int(mismatches[index])
+            if count <= self.probe_mismatches and (best is None or count < best[2]):
+                best = (hit.pos1 + first + index, strand, count)
+        return best
 
     def _count_mismatches(self, window: str, primer: str, iupac: bool) -> int:
         """Count positions where the sequence window does not match the primer."""

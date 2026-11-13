@@ -14,6 +14,7 @@ from .core.engine import (
     DEFAULT_MISMATCHES,
     DEFAULT_ONE_SIDED,
     DEFAULT_PCR_SIZE,
+    DEFAULT_PROBE_MISMATCHES,
     DEFAULT_THREADS,
     DEFAULT_THREE_PRIME_MATCH,
     DEFAULT_WORDSIZE,
@@ -31,7 +32,7 @@ def convert_mepcr_arguments(args: List[str]) -> List[str]:
     while i < len(args):
         arg = args[i]
         # Check for me-PCR style arguments (X=value)
-        if len(arg) >= 3 and arg[1] == "=" and arg[0] in "MNWXTQZISOP":
+        if len(arg) >= 3 and arg[1] == "=" and arg[0] in "MNWXTQZISOPU":
             param = arg[0]
             value = arg[2:]
 
@@ -234,6 +235,29 @@ def create_parser() -> argparse.ArgumentParser:
     )
 
     parser.add_argument(
+        "--probe-column",
+        action="store_true",
+        help=(
+            "Read column 5 of the STS file as an internal probe ('-' or empty for none); "
+            "the alias then starts at column 6. Hits of markers with a probe are reported "
+            "only when the probe matches inside the amplicon"
+        ),
+    )
+
+    parser.add_argument(
+        "--probe-mismatches",
+        type=mismatch_type,
+        default=DEFAULT_PROBE_MISMATCHES,
+        help="Number of mismatches allowed in a probe, independent of -N",
+    )
+
+    parser.add_argument(
+        "--keep-probeless",
+        action="store_true",
+        help="Also report amplicons of markers with a probe when no probe site is found",
+    )
+
+    parser.add_argument(
         "-v", "--version", action="version", version=f"merPCR version {__version__}"
     )
 
@@ -267,6 +291,9 @@ def main() -> int:
             threads=args.threads,
             max_sts_line_length=args.max_sts_line_length,
             one_sided=args.one_sided,
+            probe_column=args.probe_column,
+            probe_mismatches=args.probe_mismatches,
+            require_probe=not args.keep_probeless,
         )
 
         # Load STS file
