@@ -65,7 +65,6 @@ Full details: [docs/VERIFICATION.md](docs/VERIFICATION.md). Documentation files:
 - `make dev-install` - Install in development mode
 - `make clean` - Clean all artifacts
 - `make build` - Build distribution packages
-- `make upload` - Upload to PyPI
 
 ### Compatibility Testing
 - `python scripts/test_compatibility.py` - Verify me-PCR output compatibility on the me-PCR test data (needs a local me-PCR binary)
@@ -305,8 +304,8 @@ hit = STSHit(pos1=1000, pos2=1200, sts=sts)
 
 #### Installation Options
 ```bash
-# Production installation
-pip install merpcr
+# Installation from GitHub (the package is not published on PyPI)
+pip install git+https://github.com/FOI-Bioinformatics/merpcr.git
 
 # Development installation
 git clone <repo>

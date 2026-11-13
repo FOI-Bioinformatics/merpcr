@@ -11,8 +11,8 @@ merPCR is a Python reimplementation of me-PCR (Multithreaded Electronic PCR; Sch
 ## Installation
 
 ```bash
-pip install merpcr            # from PyPI
-pip install -e .              # from a clone of this repository
+pip install git+https://github.com/FOI-Bioinformatics/merpcr.git   # from GitHub
+pip install -e .                                                   # from a clone of this repository
 ```
 
 Python 3.13 or later and NumPy are required. A Cython extension is built during installation when a C compiler is available; without it the pure-Python implementation is used, with identical results.
