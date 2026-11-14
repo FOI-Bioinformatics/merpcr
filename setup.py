@@ -23,11 +23,8 @@ if USE_CYTHON:
             sources=["src/merpcr/core/engine_fast.pyx"],
             include_dirs=[np.get_include()],
             define_macros=[("NPY_NO_DEPRECATED_API", "NPY_1_7_API_VERSION")],
-            extra_compile_args=[
-                "-O3",  # Highest optimization
-                "-march=native",  # Use CPU-specific optimizations
-                "-ffast-math",  # Fast math operations
-            ],
+            # No -march=native: wheels must run on CPUs other than the build host
+            extra_compile_args=["-O3"],
         )
     ]
 
