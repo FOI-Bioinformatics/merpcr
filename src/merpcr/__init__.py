@@ -4,11 +4,11 @@ merPCR - Modern Electronic Rapid PCR
 Python reimplementation of the me-PCR (Multithreaded Electronic PCR) program.
 """
 
-__version__ = "1.1.1"
+__version__ = "1.2.0"
 __author__ = "merPCR Contributors"
 __license__ = "GPL-3.0"
 
 from .core.engine import MerPCR
-from .core.models import FASTARecord, SearchHit, STSHit, STSRecord
+from .core.models import FASTARecord, ProbeSite, SearchHit, STSHit, STSRecord
 
-__all__ = ["MerPCR", "STSRecord", "FASTARecord", "STSHit", "SearchHit"]
+__all__ = ["MerPCR", "STSRecord", "FASTARecord", "STSHit", "SearchHit", "ProbeSite"]

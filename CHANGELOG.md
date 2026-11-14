@@ -2,6 +2,24 @@
 
 This document records significant modifications and enhancements to the merPCR software package following semantic versioning principles.
 
+## [1.2.0] - Several probes per marker
+
+- With `--probe-column`, the probe column may hold several probes as a
+  comma-separated list, for example the two allele-specific probes of a
+  SNP assay. Each probe is looked for on its own and probe sites may
+  overlap each other. A hit is reported only when every probe has a site;
+  with `--keep-probeless` it is reported in any case.
+- The output line carries the probe fields once per probe, in the order
+  written: `probe=start..end(strand)` and `mm=count`, or `probe=none`.
+  Lines of markers with one probe or without a probe are unchanged.
+- API: `STSRecord.probes` lists the probes of a marker, and
+  `SearchHit.probe_sites` holds one `ProbeSite` (or `None`) per probe.
+  The single-probe fields of `SearchHit` describe the first probe, and
+  `probe_found` is true when every probe has a site. `ProbeSite` is
+  exported from the package.
+- An empty element in the probe list (for example a trailing comma) is
+  reported as an error when the STS file is loaded.
+
 ## [1.1.1] - Packaging and dependency maintenance
 
 - The Cython extension is no longer compiled with `-march=native` and

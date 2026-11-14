@@ -59,7 +59,8 @@ Calls `find_hits` and writes one line per hit to `output_file`, or to standard o
 | `direct` | str | `"+"` or `"-"` |
 | `ambig_primer` | int | Bit 1: `primer1` contains IUPAC codes; bit 2: `primer2` does (set only in IUPAC mode) |
 | `margin` | int | Margin for this marker, including the range adjustment |
-| `probe` | str or None | Internal probe as written in the STS file (only with `probe_column=True`) |
+| `probe` | str or None | Internal probe as written in the STS file (only with `probe_column=True`); several probes are a comma-separated list |
+| `probes` | list of str | Property: the probes in the order written, empty for a marker without a probe |
 
 ### FASTARecord
 
@@ -71,7 +72,9 @@ Returned by `find_hits`. Fields `seq_label`, `start`, `end` (1-based, inclusive)
 
 `mismatches1` and `mismatches2` count the positions at which each primer differs from the sequence, using the rule the search applied: exact comparison, or IUPAC expansion of primer codes in IUPAC mode. `seq1` and `seq2` are the matched windows on the reported strand, under the record's first primer and under the reverse complement of its second primer. Both counts are 0 for every hit when `mismatches=0`.
 
-For a marker with a probe, `probe_start` and `probe_end` (1-based, inclusive) give the probe site in the sequence, `probe_strand` is `"+"` when the probe as written matches the given sequence and `"-"` when its reverse complement does, `probe_mismatches` is the number of mismatching positions and `probe_seq` is the sequence window under the probe. The property `probe_found` is true when a site was found. For markers without a probe, and for amplicons kept with `require_probe=False` in which no site was found, these fields are `None` (`probe_seq` is empty).
+For a marker with a probe, `probe_start` and `probe_end` (1-based, inclusive) give the probe site in the sequence, `probe_strand` is `"+"` when the probe as written matches the given sequence and `"-"` when its reverse complement does, `probe_mismatches` is the number of mismatching positions and `probe_seq` is the sequence window under the probe. The property `probe_found` is true when a site was found for every probe of the marker. For markers without a probe, and for amplicons kept with `require_probe=False` in which no site was found, these fields are `None` (`probe_seq` is empty).
+
+`probe_sites` holds one entry per probe of the marker, in the order written: a `ProbeSite` (fields `start`, `end`, `strand`, `mismatches`, `seq`) or `None` when that probe has no site. It is empty for markers without a probe. For a marker with several probes, the single-probe fields above describe the first probe.
 
 ### STSHit
 

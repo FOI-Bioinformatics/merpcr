@@ -238,9 +238,10 @@ def create_parser() -> argparse.ArgumentParser:
         "--probe-column",
         action="store_true",
         help=(
-            "Read column 5 of the STS file as an internal probe ('-' or empty for none); "
+            "Read column 5 of the STS file as an internal probe ('-' or empty for none, "
+            "several probes separated by commas); "
             "the alias then starts at column 6. Hits of markers with a probe are reported "
-            "only when the probe matches inside the amplicon"
+            "only when each probe matches inside the amplicon"
         ),
     )
 
