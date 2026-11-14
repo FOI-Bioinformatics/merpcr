@@ -16,7 +16,7 @@ import numpy as np
 
 from ..io.fasta import FASTALoader
 from ..io.files import is_compressed, open_text
-from .models import FASTARecord, SearchHit, STSHit, STSRecord, ThreadData
+from .models import FASTARecord, ProbeSite, SearchHit, STSHit, STSRecord, ThreadData
 
 # Try to import Cython-optimized functions
 try:
@@ -92,7 +92,9 @@ class MerPCR:
         alias starts at the sixth column. A hit of a marker with a probe is
         reported only when the probe matches inside the amplicon with at most
         probe_mismatches mismatches, unless require_probe is False, in which
-        case such hits are kept and marked as having no probe site.
+        case such hits are kept and marked as having no probe site. The probe
+        column may hold several probes separated by commas; a hit is then
+        reported only when every probe has a site.
         """
         self.wordsize = wordsize
         self.probe_column = bool(probe_column)
@@ -272,7 +274,8 @@ class MerPCR:
 
         With probe_column set, the fifth field is an internal probe and the
         alias is everything after the fifth tab. A probe of "-" or an empty
-        field means that the marker has no probe. This layout is not part of
+        field means that the marker has no probe, and several probes are
+        written as a comma-separated list. This layout is not part of
         me-PCR; without the option the fifth field belongs to the alias.
         """
         start_time = time.time()
@@ -328,8 +331,10 @@ class MerPCR:
                 probe = None
                 if self.probe_column:
                     if len(fields) > 4 and fields[4] not in ("", "-"):
+                        # One probe, or several separated by commas
                         probe = fields[4].upper()
-                        if not set(probe) <= PROBE_ALPHABET:
+                        parts = probe.split(",")
+                        if "" in parts or not set("".join(parts)) <= PROBE_ALPHABET:
                             logger.error(
                                 f"Bad probe sequence at line {line_no} of the STS file: '{fields[4]}'"
                             )
@@ -349,7 +354,9 @@ class MerPCR:
                     bad_primers_short += 1
                     continue
 
-                if probe is not None and len(probe) > pcr_size + margin_to_use:
+                if probe is not None and any(
+                    len(part) > pcr_size + margin_to_use for part in probe.split(",")
+                ):
                     long_probes += 1
 
                 # Keep track of the maximum PCR size
@@ -692,19 +699,19 @@ class MerPCR:
 
             for hit in hits:
                 search_hit = self._make_search_hit(seq_label, sequence, hit)
-                probe = hit.sts.probe
-                if probe:
-                    site = self._find_probe(sequence, hit)
-                    if site is None:
-                        if self.require_probe:
-                            continue
-                    else:
-                        start, strand, count = site
-                        search_hit.probe_start = start + 1
-                        search_hit.probe_end = start + len(probe)
-                        search_hit.probe_strand = strand
-                        search_hit.probe_mismatches = count
-                        search_hit.probe_seq = sequence[start : start + len(probe)].upper()
+                probes = hit.sts.probes
+                if probes:
+                    sites = [self._find_probe(sequence, hit, probe) for probe in probes]
+                    if self.require_probe and any(site is None for site in sites):
+                        continue
+                    search_hit.probe_sites = sites
+                    first = sites[0]
+                    if first is not None:
+                        search_hit.probe_start = first.start
+                        search_hit.probe_end = first.end
+                        search_hit.probe_strand = first.strand
+                        search_hit.probe_mismatches = first.mismatches
+                        search_hit.probe_seq = first.seq
                 results.append(search_hit)
 
         self.hits = results
@@ -730,9 +737,9 @@ class MerPCR:
             seq2=seq2,
         )
 
-    def _find_probe(self, sequence: str, hit: STSHit) -> Optional[tuple[int, str, int]]:
+    def _find_probe(self, sequence: str, hit: STSHit, probe: str) -> Optional[ProbeSite]:
         """
-        Look for the probe of a marker inside one amplicon.
+        Look for one probe of a marker inside one amplicon.
 
         Both the probe as written (strand "+") and its reverse complement
         (strand "-") are compared with every allowed position of the amplicon
@@ -744,13 +751,13 @@ class MerPCR:
 
         Mismatches are counted position by position, without a 3' rule.
         Ambiguity codes in the probe match the bases they cover; an ambiguity
-        code in the sequence does not match. Returns (0-based start, strand,
-        mismatches) for the site with the fewest mismatches, preferring "+"
-        and then the leftmost site, or None when no site has at most
-        probe_mismatches mismatches.
+        code in the sequence does not match. Returns the site with the fewest
+        mismatches, preferring "+" and then the leftmost site, or None when
+        no site has at most probe_mismatches mismatches. Each probe of a
+        marker is looked for on its own; probe sites may overlap each other.
         """
         sts = hit.sts
-        probe = (sts.probe or "").upper()
+        probe = probe.upper()
         amplicon = sequence[hit.pos1 : hit.pos2 + 1].upper()
         probe_len = len(probe)
         amplicon_len = len(amplicon)
@@ -777,7 +784,12 @@ class MerPCR:
             count = int(mismatches[index])
             if count <= self.probe_mismatches and (best is None or count < best[2]):
                 best = (hit.pos1 + first + index, strand, count)
-        return best
+        if best is None:
+            return None
+        start, strand, count = best
+        return ProbeSite(
+            start + 1, start + probe_len, strand, count, sequence[start : start + probe_len].upper()
+        )
 
     def _count_mismatches(self, window: str, primer: str, iupac: bool) -> int:
         """Count positions where the sequence window does not match the primer."""

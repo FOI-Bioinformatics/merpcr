@@ -382,3 +382,134 @@ class TestProbeCli:
 
     def test_legacy_one_sided_argument_is_converted(self):
         assert convert_mepcr_arguments(["U=1", "a.sts", "b.fa"]) == ["-U", "1", "a.sts", "b.fa"]
+
+
+PROBE2 = "ACGGTCTTAGCAAGTCCGTA"
+INNER2 = PROBE + "GATC" + PROBE2  # both probes on the "+" strand
+SIZE2 = len(make_amplicon(INNER2))
+
+
+def sts_line2(probe: str, alias: str = "my alias") -> str:
+    return "\t".join(["ASSAY", PRIMER1, PRIMER2, str(SIZE2), probe, alias]) + "\n"
+
+
+class TestSeveralProbes:
+    """A marker may carry several probes as a comma-separated list in column 5."""
+
+    def test_parsing(self, tmp_path):
+        engine = MerPCR(probe_column=True)
+        assert engine.load_sts_file(write_sts(tmp_path, sts_line2(f"{PROBE},{PROBE2.lower()}")))
+        for record in engine.sts_records:
+            assert record.probe == f"{PROBE},{PROBE2}"
+            assert record.probes == [PROBE, PROBE2]
+            assert record.alias == "my alias"
+
+    def test_probes_property_for_one_and_no_probe(self, tmp_path):
+        engine = MerPCR(probe_column=True)
+        assert engine.load_sts_file(write_sts(tmp_path, sts_line(), sts_line(probe="-")))
+        assert [r.probes for r in engine.sts_records if r.direct == "+"] == [[PROBE], []]
+
+    @pytest.mark.parametrize("probe", [f"{PROBE},", f",{PROBE}", f"{PROBE},,{PROBE2}", ","])
+    def test_empty_list_element_is_an_error(self, tmp_path, probe):
+        engine = MerPCR(probe_column=True)
+        assert not engine.load_sts_file(write_sts(tmp_path, sts_line2(probe)))
+
+    def test_invalid_character_in_second_probe_is_an_error(self, tmp_path):
+        engine = MerPCR(probe_column=True)
+        assert not engine.load_sts_file(write_sts(tmp_path, sts_line2(f"{PROBE},ACGTX")))
+
+    def test_all_probes_found(self, tmp_path):
+        sequence = make_sequence(make_amplicon(INNER2))
+        hits = run(tmp_path, sequence, sts_line2(f"{PROBE},{rc(PROBE2)}"))
+        assert len(hits) == 1
+        hit = hits[0]
+        assert hit.probe_found
+        first, second = hit.probe_sites
+        assert (first.start, first.end, first.strand, first.mismatches) == (129, 148, "+", 0)
+        assert (second.start, second.end, second.strand, second.mismatches) == (153, 172, "-", 0)
+        assert first.seq == PROBE and second.seq == PROBE2
+        # The single-probe fields describe the first probe
+        assert (hit.probe_start, hit.probe_end, hit.probe_strand) == (129, 148, "+")
+        assert hit.probe_mismatches == 0 and hit.probe_seq == PROBE
+        assert hit.format() == (
+            "seq\t101..200\tASSAY\tmy alias\t(+)"
+            "\tprobe=129..148(+)\tmm=0\tprobe=153..172(-)\tmm=0"
+        )
+
+    def test_sites_follow_the_order_written(self, tmp_path):
+        sequence = make_sequence(make_amplicon(INNER2))
+        hits = run(tmp_path, sequence, sts_line2(f"{PROBE2},{PROBE}"))
+        assert [site.start for site in hits[0].probe_sites] == [153, 129]
+
+    def test_hit_is_dropped_when_one_probe_is_missing(self, tmp_path):
+        inner = PROBE + "GATC" + random_dna(len(PROBE2), 5)
+        sequence = make_sequence(make_amplicon(inner))
+        assert run(tmp_path, sequence, sts_line2(f"{PROBE},{PROBE2}")) == []
+
+    @pytest.mark.parametrize(
+        "order, expected",
+        [(0, "probe=129..148(+)\tmm=0\tprobe=none"), (1, "probe=none\tprobe=129..148(+)\tmm=0")],
+    )
+    def test_keep_probeless_reports_each_probe(self, tmp_path, order, expected):
+        inner = PROBE + "GATC" + random_dna(len(PROBE2), 5)
+        sequence = make_sequence(make_amplicon(inner))
+        probes = [PROBE, PROBE2] if order == 0 else [PROBE2, PROBE]
+        hits = run(tmp_path, sequence, sts_line2(",".join(probes)), require_probe=False)
+        assert len(hits) == 1
+        hit = hits[0]
+        assert not hit.probe_found
+        assert [site is None for site in hit.probe_sites] == [order == 1, order == 0]
+        assert (hit.probe_start is None) == (order == 1)
+        assert hit.format() == "seq\t101..200\tASSAY\tmy alias\t(+)\t" + expected
+
+    def test_keep_probeless_without_any_site(self, tmp_path):
+        sequence = make_sequence(make_amplicon(random_dna(len(INNER2), 6)))
+        hits = run(tmp_path, sequence, sts_line2(f"{PROBE},{PROBE2}"), require_probe=False)
+        assert hits[0].probe_sites == [None, None]
+        assert hits[0].format() == "seq\t101..200\tASSAY\tmy alias\t(+)\tprobe=none\tprobe=none"
+
+    def test_mismatch_limit_applies_to_each_probe(self, tmp_path):
+        mutated = PROBE2[:9] + ("A" if PROBE2[9] != "A" else "C") + PROBE2[10:]
+        sequence = make_sequence(make_amplicon(PROBE + "GATC" + mutated))
+        line = sts_line2(f"{PROBE},{PROBE2}")
+        assert run(tmp_path, sequence, line) == []
+        hits = run(tmp_path, sequence, line, probe_mismatches=1)
+        assert [site.mismatches for site in hits[0].probe_sites] == [0, 1]
+
+    def test_allele_probes_may_share_a_site(self, tmp_path):
+        other_allele = PROBE[:9] + ("A" if PROBE[9] != "A" else "C") + PROBE[10:]
+        line = sts_line(probe=f"{PROBE},{other_allele}")
+        assert run(tmp_path, make_sequence(), line) == []
+        hits = run(tmp_path, make_sequence(), line, require_probe=False)
+        assert hits[0].format() == (
+            "seq\t101..176\tASSAY\tmy alias\t(+)\tprobe=129..148(+)\tmm=0\tprobe=none"
+        )
+        hits = run(tmp_path, make_sequence(), line, probe_mismatches=1)
+        assert [site.mismatches for site in hits[0].probe_sites] == [0, 1]
+
+    def test_marker_on_minus_strand(self, tmp_path):
+        sequence = make_sequence(rc(make_amplicon(INNER2)))
+        hits = run(tmp_path, sequence, sts_line2(f"{PROBE},{PROBE2}"))
+        assert len(hits) == 1
+        assert hits[0].strand == "-"
+        assert [site.strand for site in hits[0].probe_sites] == ["-", "-"]
+
+    def test_threads_and_pure_python_give_same_hits(self, tmp_path, monkeypatch):
+        sequence = _large_sequence() + make_amplicon(INNER2) + random_dna(500, 8)
+        line = sts_line2(f"{PROBE},{PROBE2}")
+        single = run(tmp_path, sequence, line, threads=1)
+        assert len(single) == 1 and len(single[0].probe_sites) == 2
+        assert run(tmp_path, sequence, line, threads=4) == single
+        monkeypatch.setattr(engine_module, "HAS_CYTHON", False)
+        assert run(tmp_path, sequence, line, threads=1) == single
+
+    def test_cli(self, monkeypatch, capsys, tmp_path):
+        sts = write_sts(tmp_path, sts_line2(f"{PROBE},{PROBE2}"))
+        fasta = tmp_path / "seq.fa"
+        fasta.write_text(">seq\n" + make_sequence(make_amplicon(INNER2)) + "\n")
+        monkeypatch.setattr(sys, "argv", ["merpcr", sts, str(fasta), "--probe-column"])
+        main()
+        assert capsys.readouterr().out == (
+            "seq\t101..200\tASSAY\tmy alias\t(+)"
+            "\tprobe=129..148(+)\tmm=0\tprobe=153..172(+)\tmm=0\n"
+        )

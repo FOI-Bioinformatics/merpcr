@@ -36,6 +36,7 @@ identifier<TAB>forward primer<TAB>reverse primer<TAB>product size[<TAB>probe[<TA
 ```
 assay1	GATTACAGGCTAGCTTAC	CCATGGTTAGCAATCGGA	76	TTGACCGATAGGCATCCAGT	with probe
 assay2	GAATGAACAGAGATGATGCCT	CACACACACACACACCACAC	142	-	no probe
+assay3	GATTACAGGCTAGCTTAC	CCATGGTTAGCAATCGGA	100	TTGACCGATAGGCATCCAGT,ACGGTCTTAGCAAGTCCGTA	two probes
 ```
 
 - The probe is given 5' to 3' on either strand. `-` or an empty field means that the marker has no probe; such a marker is treated exactly as without the option.
@@ -43,6 +44,7 @@ assay2	GAATGAACAGAGATGATGCCT	CACACACACACACACCACAC	142	-	no probe
 - Up to `--probe-mismatches` mismatches are allowed in the probe (default 0), independently of `-N`, and there is no 3' rule for the probe. IUPAC codes in a probe are always interpreted, also without `-I 1`. As for primers, an ambiguity code in the sequence counts as a mismatch.
 - When several sites qualify, the one with the fewest mismatches is reported; ties go to the site matching the probe as written and then to the leftmost site.
 - Amplicons without a probe site are not reported, unless `--keep-probeless` is set.
+- Several probes for one marker are written as a comma-separated list without spaces. Each probe is looked for on its own with the rules above, and probe sites may overlap each other, as for two allele-specific probes. The amplicon is reported only when every probe has a site; with `--keep-probeless` it is reported in any case, and the output shows which probes have a site.
 - The comparison is by sequence only. Melting temperature, insertions and deletions are not considered.
 - This layout is an extension of the me-PCR format. Without `--probe-column`, a fifth column is part of the annotation, as in me-PCR.
 
@@ -66,7 +68,7 @@ For a marker with a probe (`--probe-column`), two fields are appended:
 label<TAB>start..end<TAB>identifier[<TAB>annotation]<TAB>(strand)<TAB>probe=start..end(strand)<TAB>mm=count
 ```
 
-The probe positions are 1-based and refer to the given sequence. The probe strand is `(+)` when the probe as written matches the given strand and `(-)` when its reverse complement does; it is independent of the strand of the marker. `mm` is the number of mismatches in the probe. With `--keep-probeless`, an amplicon without a probe site ends in the single field `probe=none`. Lines of markers without a probe are not changed.
+The probe positions are 1-based and refer to the given sequence. The probe strand is `(+)` when the probe as written matches the given strand and `(-)` when its reverse complement does; it is independent of the strand of the marker. `mm` is the number of mismatches in the probe. With `--keep-probeless`, an amplicon without a probe site ends in the single field `probe=none`. For a marker with several probes the fields are repeated for each probe in the order written in the STS file, for example `probe=129..148(+)<TAB>mm=0<TAB>probe=none` when only the first of two probes has a site. Lines of markers without a probe are not changed.
 
 Hits are reported per sequence in the order the scan finds them. Because the scan triggers on the 3'-most word of a primer, a marker with a shorter primer can be reported before a marker that starts earlier, and markers sharing a hash word are checked most-recent-first. This matches me-PCR; sort the output by position if a positional order is needed.
 

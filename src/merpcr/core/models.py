@@ -30,8 +30,14 @@ class STSRecord:
     direct: str = "+"  # Orientation: '+' for forward, '-' for reverse
     ambig_primer: int = 0  # Flags indicating which primers have ambiguities
     margin: int = 0  # Per-STS margin (may be adjusted for PCR size ranges)
-    # Optional internal probe, as written in the STS file (see MerPCR probe_column)
+    # Optional internal probe, as written in the STS file (see MerPCR probe_column).
+    # Several probes are written as a comma-separated list.
     probe: Optional[str] = None
+
+    @property
+    def probes(self) -> List[str]:
+        """The probes of the marker, in the order written; empty without a probe."""
+        return self.probe.split(",") if self.probe else []
 
 
 @dataclass
@@ -50,6 +56,24 @@ class FASTARecord:
             defline = self.defline.lstrip(" \t").lstrip(">").lstrip(" \t")
             words = defline.split(None, 1)
             self.label = words[0] if words else ""
+
+
+@dataclass
+class ProbeSite:
+    """
+    The site of one probe inside an amplicon.
+
+    start and end are 1-based inclusive positions in the sequence, strand is
+    "+" when the probe as written matches the given sequence and "-" when its
+    reverse complement does, mismatches is the number of mismatching
+    positions and seq is the sequence window under the probe.
+    """
+
+    start: int
+    end: int
+    strand: str
+    mismatches: int
+    seq: str = ""
 
 
 @dataclass
@@ -83,6 +107,10 @@ class SearchHit:
     complement does, probe_mismatches is the number of mismatching positions
     and probe_seq is the sequence window under the probe. They are None (or
     empty) when the marker has no probe or no probe site was found.
+
+    For a marker with several probes, probe_sites holds one entry per probe
+    in the order written, a ProbeSite or None when that probe has no site,
+    and the single-probe fields above describe the first probe.
     """
 
     seq_label: str
@@ -98,6 +126,7 @@ class SearchHit:
     probe_strand: Optional[str] = None
     probe_mismatches: Optional[int] = None
     probe_seq: str = ""
+    probe_sites: List[Optional[ProbeSite]] = field(default_factory=list)
 
     @property
     def mismatches(self) -> int:
@@ -121,18 +150,41 @@ class SearchHit:
         """Product size in bp."""
         return self.end - self.start + 1
 
+    def _sites(self) -> List[Optional[ProbeSite]]:
+        """One entry per probe; falls back to the single-probe fields."""
+        if self.probe_sites:
+            return self.probe_sites
+        if (
+            self.probe_start is not None
+            and self.probe_end is not None
+            and self.probe_strand is not None
+            and self.probe_mismatches is not None
+        ):
+            return [
+                ProbeSite(
+                    self.probe_start,
+                    self.probe_end,
+                    self.probe_strand,
+                    self.probe_mismatches,
+                    self.probe_seq,
+                )
+            ]
+        return [None] * len(self.sts.probes)
+
     @property
     def probe_found(self) -> bool:
-        """True when the marker has a probe and a probe site was found."""
-        return self.probe_start is not None
+        """True when the marker has probes and a site was found for each of them."""
+        sites = self._sites()
+        return bool(sites) and all(site is not None for site in sites)
 
     def format(self) -> str:
         """
         Return the output line for this hit.
 
         For a marker without a probe this is the me-PCR output line. For a
-        marker with a probe two tab-separated fields are appended, the probe
-        site and its mismatch count, or "probe=none" when no site was found.
+        marker with probes, tab-separated fields are appended for each probe
+        in the order written: the probe site and its mismatch count, or the
+        single field "probe=none" when that probe has no site.
         """
         alias_field = "" if self.sts.alias is None else f"\t{self.sts.alias}"
         line = (
@@ -141,12 +193,12 @@ class SearchHit:
         )
         if not self.sts.probe:
             return line
-        if not self.probe_found:
-            return f"{line}\tprobe=none"
-        return (
-            f"{line}\tprobe={self.probe_start}..{self.probe_end}({self.probe_strand})"
-            f"\tmm={self.probe_mismatches}"
-        )
+        for site in self._sites():
+            if site is None:
+                line += "\tprobe=none"
+            else:
+                line += f"\tprobe={site.start}..{site.end}({site.strand})\tmm={site.mismatches}"
+        return line
 
 
 @dataclass

@@ -51,7 +51,7 @@ L78833	75823..76023	AFM248yg9	(D17S932)  Chr.17, 63.7 cM	(-)
 
 The fields are sequence label, 1-based start and end of the product, STS identifier, the annotation when present, and the strand.
 
-As an extension of the me-PCR format, a marker can carry an internal probe (for example a hydrolysis probe) in a fifth column when `--probe-column` is given. A hit is then reported only if the probe also matches inside the amplicon, and its line ends with the probe site and mismatch count, such as `probe=129..148(+)	mm=0`. Lines of markers without a probe are not changed. The [user guide](docs/USER_GUIDE.md) describes the file formats, the parameters and the search algorithm in detail.
+As an extension of the me-PCR format, a marker can carry an internal probe (for example a hydrolysis probe) in a fifth column when `--probe-column` is given. A hit is then reported only if the probe also matches inside the amplicon, and its line ends with the probe site and mismatch count, such as `probe=129..148(+)	mm=0`. Several probes for one marker are given as a comma-separated list, and all of them must match. Lines of markers without a probe are not changed. The [user guide](docs/USER_GUIDE.md) describes the file formats, the parameters and the search algorithm in detail.
 
 ### Python API
 
