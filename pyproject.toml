@@ -1,10 +1,10 @@
 [build-system]
-requires = ["setuptools>=61.0", "wheel", "Cython>=3.0.0", "numpy>=1.24.0"]
+requires = ["setuptools>=84.1.0", "wheel", "Cython>=3.1.0", "numpy>=2.0.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "merpcr"
-version = "1.1.0"
+version = "1.1.1"
 description = "Modern Electronic Rapid PCR - Python reimplementation of me-PCR"
 authors = [
     {name = "merPCR Contributors"},
@@ -13,7 +13,7 @@ readme = "README.md"
 license = {text = "GPL-3.0"}
 requires-python = ">=3.13"
 dependencies = [
-    "numpy>=1.24.0",
+    "numpy>=1.26.0",
 ]
 classifiers = [
     "Development Status :: 5 - Production/Stable",
@@ -27,25 +27,25 @@ classifiers = [
 keywords = ["bioinformatics", "pcr", "sts", "sequence-analysis", "genomics"]
 
 [project.urls]
-Homepage = "https://github.com/merpcr/merpcr"
-Repository = "https://github.com/merpcr/merpcr"
-Issues = "https://github.com/merpcr/merpcr/issues"
+Homepage = "https://github.com/FOI-Bioinformatics/merpcr"
+Repository = "https://github.com/FOI-Bioinformatics/merpcr"
+Issues = "https://github.com/FOI-Bioinformatics/merpcr/issues"
 
 [project.scripts]
 merpcr = "merpcr.cli:main"
 
 [project.optional-dependencies]
 dev = [
-    "pytest>=7.0",
-    "pytest-cov",
-    "pytest-timeout",
-    "hypothesis",
-    "psutil",
-    "black",
-    "isort",
-    "flake8",
-    "mypy",
-    "Cython>=3.0.0",
+    "pytest>=9.0.3",
+    "pytest-cov>=6.0",
+    "pytest-timeout>=2.3",
+    "hypothesis>=6.100",
+    "psutil>=6.0",
+    "black>=25.1",
+    "isort>=6.0",
+    "flake8>=7.0",
+    "mypy>=1.17",
+    "Cython>=3.1.0",
 ]
 
 [tool.setuptools.packages.find]

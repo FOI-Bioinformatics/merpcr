@@ -4,7 +4,7 @@
 
 The scan over the sequence and the primer comparison are implemented twice: in `src/merpcr/core/engine.py` (pure Python, NumPy lookup tables) and in `src/merpcr/core/engine_fast.pyx` (Cython). The Cython module is compiled during `pip install` when a C compiler is available and is used automatically; otherwise the engine falls back to the Python implementation. Both paths are tested against each other and against me-PCR and produce identical output.
 
-The Cython path avoids interpreter overhead in the rolling-hash loop and compares primers through byte memoryviews. Compiler flags are `-O3`, `-march=native` and `-ffast-math`; bounds checking and negative indexing are disabled.
+The Cython path avoids interpreter overhead in the rolling-hash loop and compares primers through byte memoryviews. The extension is compiled with `-O3`; bounds checking and negative indexing are disabled.
 
 To rebuild the extension after editing the `.pyx` file:
 

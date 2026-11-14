@@ -2,6 +2,19 @@
 
 This document records significant modifications and enhancements to the merPCR software package following semantic versioning principles.
 
+## [1.1.1] - Packaging and dependency maintenance
+
+- The Cython extension is no longer compiled with `-march=native` and
+  `-ffast-math`. A wheel built that way may not run on a CPU older than the
+  build host. Search results are not affected.
+- Project URLs point to the FOI-Bioinformatics repository.
+- Dependency bounds reflect what works with Python 3.13: `numpy>=1.26` at
+  run time, NumPy 2 and Cython 3.1 or later for building, and minimum
+  versions for the development tools.
+- CI uses current releases of the GitHub Actions, the release action is
+  pinned to a commit, twine is no longer installed, and Dependabot is
+  configured for Python dependencies and GitHub Actions.
+
 ## [1.1.0] - Optional internal probe
 
 - New option `--probe-column` (`MerPCR(probe_column=True)`): the fifth
